@@ -3,228 +3,607 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   TouchableOpacity,
+  Image,
   ScrollView,
+  SafeAreaView,
+  StatusBar,
+  Platform,
+  ActivityIndicator
 } from 'react-native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
+import { createDrawerNavigator } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
-import { DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
 import { useAuth } from '../context/AuthContext';
 import Colors from '../constants/Colors';
 
-const DrawerContent = (props) => {
+// Import screens for Customer side
+import HomeScreen from '../screens/HomeScreen';
+import HandymanDetailScreen from '../screens/HandymanDetailScreen';
+import ProjectBidScreen from '../screens/ProjectBidScreen';
+import MyProjectsScreen from '../screens/MyProjectsScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import ChatListScreen from '../screens/ChatListScreen';
+import ChatScreen from '../screens/ChatScreen';
+
+// Import screens for Handyman side
+import HandymanHomeScreen from '../screens/HandymanHomeScreen';
+import ProjectDetailScreen from '../screens/ProjectDetailScreen';
+
+// Import settings screens
+import SettingsScreen from '../screens/SettingsScreen';
+import LanguageSettingsScreen from '../screens/LanguageSettingsScreen';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
+import HelpCenterScreen from '../screens/HelpCenterScreen';
+import ContactSupportScreen from '../screens/ContactSupportScreen';
+
+// Import auth screens
+import LoginScreen from '../screens/LoginScreen';
+
+// Define DrawerContent component with proper status bar handling
+const DrawerContent = ({ navigation }) => {
   const { userType, logout } = useAuth();
   
-  // Mock user data - in a real app, this would come from your auth context
+  // Sample user profile data
   const user = {
     name: 'John Smith',
     email: 'john.smith@example.com',
     avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
+    rating: userType === 'handyman' ? 4.8 : null,
   };
-  
-  const handleLogout = () => {
-    // Call logout function from Auth Context
-    logout();
+
+  // Navigation helper functions
+  const navigateToTab = (tabName) => {
+    navigation.navigate(userType === 'handyman' ? 'HandymanTabs' : 'CustomerTabs', {
+      screen: tabName
+    });
+    navigation.closeDrawer();
   };
-  
+
+  const navigateToNestedScreen = (tabName, screenName, params = {}) => {
+    navigation.navigate(userType === 'handyman' ? 'HandymanTabs' : 'CustomerTabs', {
+      screen: tabName,
+      params: {
+        screen: screenName,
+        params: params
+      }
+    });
+    navigation.closeDrawer();
+  };
+
   return (
-    <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
-      <View style={styles.userInfoSection}>
-        <TouchableOpacity 
-          style={styles.userInfoHeader}
-          onPress={() => props.navigation.navigate('ProfileTab')}
-        >
+    <View style={styles.drawerContainer}>
+      {/* Status bar handling */}
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      
+      {/* Safe area view for proper status bar handling */}
+      <SafeAreaView style={styles.safeAreaTop} />
+      
+      <SafeAreaView style={styles.safeAreaContent}>
+        <View style={styles.userInfoSection}>
           <Image source={{ uri: user.avatar }} style={styles.avatar} />
-          <View style={styles.userInfo}>
-            <Text style={styles.name}>{user.name}</Text>
-            <Text style={styles.email}>{user.email}</Text>
-            <View style={styles.userTypeContainer}>
-              <Ionicons 
-                name={userType === 'customer' ? 'person' : 'hammer'} 
-                size={12} 
-                color={Colors.white} 
-              />
-              <Text style={styles.userTypeText}>
-                {userType === 'customer' ? 'Customer' : 'Handyman'}
-              </Text>
-            </View>
+          <View style={styles.userDetails}>
+            <Text style={styles.userName}>{user.name}</Text>
+            <Text style={styles.userEmail}>{user.email}</Text>
+            {userType === 'handyman' && (
+              <View style={styles.ratingContainer}>
+                <Ionicons name="star" size={16} color="#FFC107" />
+                <Text style={styles.ratingText}>{user.rating}</Text>
+              </View>
+            )}
           </View>
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.drawerSection}>
-        <DrawerItem
-          icon={({ color, size }) => (
-            <Ionicons name="home-outline" color={color} size={size} />
-          )}
-          label="Home"
-          onPress={() => props.navigation.navigate('Home')}
-          activeTintColor={Colors.primary}
-          style={styles.drawerItem}
-        />
+        </View>
         
-        <DrawerItem
-          icon={({ color, size }) => (
-            <Ionicons name="briefcase-outline" color={color} size={size} />
-          )}
-          label="My Projects"
-          onPress={() => props.navigation.navigate('MyProjects')}
-          activeTintColor={Colors.primary}
-          style={styles.drawerItem}
-        />
+        <ScrollView style={styles.menuSection}>
+          {/* Dashboard/Home */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigateToTab(userType === 'handyman' ? 'Dashboard' : 'HomeTab')}
+          >
+            <Ionicons name="home-outline" size={22} color="#555" />
+            <Text style={styles.menuItemText}>{userType === 'handyman' ? 'Dashboard' : 'Home'}</Text>
+          </TouchableOpacity>
+          
+          {/* My Projects */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigateToTab('MyProjects')}
+          >
+            <Ionicons name={userType === 'handyman' ? 'construct-outline' : 'briefcase-outline'} size={22} color="#555" />
+            <Text style={styles.menuItemText}>My Projects</Text>
+          </TouchableOpacity>
+          
+          {/* Messages */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigateToTab('ChatTab')}
+          >
+            <Ionicons name="chatbubbles-outline" size={22} color="#555" />
+            <Text style={styles.menuItemText}>Messages</Text>
+          </TouchableOpacity>
+          
+          {/* Profile */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigateToTab('ProfileTab')}
+          >
+            <Ionicons name="person-outline" size={22} color="#555" />
+            <Text style={styles.menuItemText}>Profile</Text>
+          </TouchableOpacity>
+          
+          {/* Settings */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigateToNestedScreen('ProfileTab', 'Settings')}
+          >
+            <Ionicons name="settings-outline" size={22} color="#555" />
+            <Text style={styles.menuItemText}>Settings</Text>
+          </TouchableOpacity>
+          
+          {/* Help & Support */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigateToNestedScreen('ProfileTab', 'HelpCenter')}
+          >
+            <Ionicons name="help-circle-outline" size={22} color="#555" />
+            <Text style={styles.menuItemText}>Help & Support</Text>
+          </TouchableOpacity>
+        </ScrollView>
         
-        <DrawerItem
-          icon={({ color, size }) => (
-            <Ionicons name="chatbubbles-outline" color={color} size={size} />
-          )}
-          label="Messages"
-          onPress={() => props.navigation.navigate('ChatTab')}
-          activeTintColor={Colors.primary}
-          style={styles.drawerItem}
-        />
-        
-        <DrawerItem
-          icon={({ color, size }) => (
-            <Ionicons name="heart-outline" color={color} size={size} />
-          )}
-          label="Favorites"
-          onPress={() => props.navigation.navigate('Favorites')}
-          activeTintColor={Colors.primary}
-          style={styles.drawerItem}
-        />
-      </View>
-      
-      <View style={styles.divider} />
-      
-      <View style={styles.drawerSection}>
-        <DrawerItem
-          icon={({ color, size }) => (
-            <Ionicons name="settings-outline" color={color} size={size} />
-          )}
-          label="Settings"
-          onPress={() => props.navigation.navigate('ProfileTab')}
-          activeTintColor={Colors.primary}
-          style={styles.drawerItem}
-        />
-        
-        <DrawerItem
-          icon={({ color, size }) => (
-            <Ionicons name="help-circle-outline" color={color} size={size} />
-          )}
-          label="Help & Support"
-          onPress={() => props.navigation.navigate('Help')}
-          activeTintColor={Colors.primary}
-          style={styles.drawerItem}
-        />
-        
-        <DrawerItem
-          icon={({ color, size }) => (
-            <Ionicons name="information-circle-outline" color={color} size={size} />
-          )}
-          label="About"
-          onPress={() => props.navigation.navigate('About')}
-          activeTintColor={Colors.primary}
-          style={styles.drawerItem}
-        />
-      </View>
-      
-      <View style={styles.divider} />
-      
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out-outline" size={22} color={Colors.error} />
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
-      
-      <View style={styles.versionContainer}>
-        <Text style={styles.versionText}>TooKang v1.0.0</Text>
-      </View>
-    </DrawerContentScrollView>
+        <View style={styles.bottomSection}>
+          <TouchableOpacity 
+            style={[styles.menuItem, styles.logoutItem]}
+            onPress={() => {
+              logout();
+              navigation.closeDrawer();
+            }}
+          >
+            <Ionicons name="log-out-outline" size={22} color="#E53935" />
+            <Text style={[styles.menuItemText, styles.logoutText]}>Logout</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
-  drawerContent: {
-    flex: 1,
-  },
-  userInfoSection: {
-    paddingLeft: 20,
+// Create navigators
+const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
+const Drawer = createDrawerNavigator();
+
+// Common header options to include the menu button on all stack screens
+const getStackScreenOptions = (navigation) => ({
+  headerStyle: {
     backgroundColor: Colors.primary,
   },
-  userInfoHeader: {
-    flexDirection: 'row',
+  headerTintColor: Colors.white,
+  headerTitleStyle: {
+    fontWeight: 'bold',
+  },
+  headerLeft: () => (
+    <Ionicons
+      name="menu"
+      size={25}
+      color={Colors.white}
+      style={{ marginLeft: 15 }}
+      onPress={() => navigation.openDrawer()}
+    />
+  ),
+});
+
+// Authentication stack navigator
+function AuthStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Login" component={LoginScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// Chat stack navigator for both user types
+function ChatStack({ navigation }) {
+  return (
+    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
+      <Stack.Screen 
+        name="ChatList" 
+        component={ChatListScreen} 
+        options={{ title: 'Messages' }} 
+      />
+      <Stack.Screen 
+        name="Chat" 
+        component={ChatScreen} 
+        options={({ route }) => ({ 
+          title: route.params?.recipient?.name || '' 
+        })} 
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Settings stack navigator
+function SettingsStack({ navigation }) {
+  return (
+    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
+      <Stack.Screen 
+        name="SettingsMain" 
+        component={SettingsScreen} 
+        options={{ title: 'Settings' }} 
+      />
+      <Stack.Screen 
+        name="LanguageSettings" 
+        component={LanguageSettingsScreen} 
+        options={{ title: 'Language' }} 
+      />
+      <Stack.Screen 
+        name="ChangePassword" 
+        component={ChangePasswordScreen} 
+        options={{ title: 'Change Password' }} 
+      />
+      <Stack.Screen 
+        name="PrivacyPolicy" 
+        component={PrivacyPolicyScreen} 
+        options={{ title: 'Privacy Policy' }} 
+      />
+      <Stack.Screen 
+        name="HelpCenter" 
+        component={HelpCenterScreen} 
+        options={{ title: 'Help Center' }} 
+      />
+      <Stack.Screen 
+        name="ContactSupport" 
+        component={ContactSupportScreen} 
+        options={{ title: 'Contact Support' }} 
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Profile stack navigator for both user types
+function ProfileStack({ navigation }) {
+  return (
+    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
+      <Stack.Screen 
+        name="ProfileMain" 
+        component={ProfileScreen} 
+        options={{ title: 'Profile' }} 
+      />
+      <Stack.Screen 
+        name="EditProfile" 
+        component={EditProfileScreen} 
+        options={{ title: 'Edit Profile' }} 
+      />
+      <Stack.Screen 
+        name="Settings" 
+        component={SettingsStack} 
+        options={{ headerShown: false }} 
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Customer's home stack navigator
+function HomeStack({ navigation }) {
+  return (
+    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
+      <Stack.Screen 
+        name="Home" 
+        component={HomeScreen} 
+        options={{ title: 'TooKang' }}
+      />
+      <Stack.Screen 
+        name="HandymanDetail" 
+        component={HandymanDetailScreen} 
+        options={{ title: 'Handyman Profile' }} 
+      />
+      <Stack.Screen 
+        name="ProjectBid" 
+        component={ProjectBidScreen} 
+        options={{ title: 'Create Project Bid' }} 
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Handyman stack navigator
+function HandymanStack({ navigation }) {
+  return (
+    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
+      <Stack.Screen 
+        name="HandymanDashboard" 
+        component={HandymanHomeScreen} 
+        options={{ title: 'Dashboard' }}
+      />
+      <Stack.Screen 
+        name="ProjectDetails" 
+        component={ProjectDetailScreen} 
+        options={{ title: 'Project Details' }} 
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Customer's bottom tab navigator
+function CustomerTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+
+          if (route.name === 'HomeTab') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'MyProjects') {
+            iconName = focused ? 'briefcase' : 'briefcase-outline';
+          } else if (route.name === 'ChatTab') {
+            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+          } else if (route.name === 'ProfileTab') {
+            iconName = focused ? 'person' : 'person-outline';
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: Colors.primary,
+        tabBarInactiveTintColor: 'gray',
+      })}
+    >
+      <Tab.Screen 
+        name="HomeTab" 
+        component={HomeStack} 
+        options={{ 
+          headerShown: false,
+          title: 'Home'
+        }} 
+      />
+      <Tab.Screen 
+        name="MyProjects" 
+        component={MyProjectsScreen} 
+        options={({ navigation }) => ({
+          title: 'My Projects',
+          headerStyle: {
+            backgroundColor: Colors.primary,
+          },
+          headerTintColor: Colors.white,
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+          headerLeft: () => (
+            <Ionicons
+              name="menu"
+              size={25}
+              color={Colors.white}
+              style={{ marginLeft: 15 }}
+              onPress={() => navigation.openDrawer()}
+            />
+          ),
+        })} 
+      />
+      <Tab.Screen 
+        name="ChatTab" 
+        component={ChatStack} 
+        options={{ 
+          headerShown: false,
+          title: 'Messages'
+        }} 
+      />
+      <Tab.Screen 
+        name="ProfileTab" 
+        component={ProfileStack} 
+        options={{ 
+          headerShown: false,
+          title: 'Profile'
+        }} 
+      />
+    </Tab.Navigator>
+  );
+}
+
+// Handyman's bottom tab navigator
+function HandymanTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+
+          if (route.name === 'Dashboard') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'ChatTab') {
+            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+          } else if (route.name === 'ProfileTab') {
+            iconName = focused ? 'person' : 'person-outline';
+          }
+
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: Colors.primary,
+        tabBarInactiveTintColor: 'gray',
+      })}
+    >
+      <Tab.Screen 
+        name="Dashboard" 
+        component={HandymanStack} 
+        options={{ 
+          headerShown: false,
+          title: 'Dashboard'
+        }} 
+      />
+      <Tab.Screen 
+        name="ChatTab" 
+        component={ChatStack} 
+        options={{ 
+          headerShown: false,
+          title: 'Messages'
+        }} 
+      />
+      <Tab.Screen 
+        name="ProfileTab" 
+        component={ProfileStack} 
+        options={{ 
+          headerShown: false,
+          title: 'Profile'
+        }} 
+      />
+    </Tab.Navigator>
+  );
+}
+
+// Customer drawer navigation with gesture enabled
+function CustomerDrawer() {
+  return (
+    <Drawer.Navigator
+      drawerContent={(props) => <DrawerContent {...props} />}
+      screenOptions={{
+        headerShown: false,
+        drawerStyle: {
+          width: '75%',
+        },
+        gestureEnabled: true,  // Enable gesture to open drawer on all screens
+      }}
+    >
+      <Drawer.Screen name="CustomerTabs" component={CustomerTabs} />
+    </Drawer.Navigator>
+  );
+}
+
+// Handyman drawer navigation with gesture enabled
+function HandymanDrawer() {
+  return (
+    <Drawer.Navigator
+      drawerContent={(props) => <DrawerContent {...props} />}
+      screenOptions={{
+        headerShown: false,
+        drawerStyle: {
+          width: '75%',
+        },
+        gestureEnabled: true,  // Enable gesture to open drawer on all screens
+      }}
+    >
+      <Drawer.Screen name="HandymanTabs" component={HandymanTabs} />
+    </Drawer.Navigator>
+  );
+}
+
+// Root navigator with Auth context
+const AppNavigator = () => {
+  // Get authentication state from context
+  const { isLoading, userToken, userType } = useAuth();
+  
+  // Show loading indicator while checking authentication state
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+  
+  // Return the appropriate navigator based on authentication state
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {userToken === null ? (
+        // User is not logged in
+        <Stack.Screen name="Auth" component={AuthStack} />
+      ) : userType === 'customer' ? (
+        // User logged in as customer
+        <Stack.Screen name="CustomerRoot" component={CustomerDrawer} />
+      ) : (
+        // User logged in as handyman
+        <Stack.Screen name="HandymanRoot" component={HandymanDrawer} />
+      )}
+    </Stack.Navigator>
+  );
+};
+
+// Styles
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 20,
+  },
+  drawerContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  safeAreaTop: {
+    backgroundColor: '#FFFFFF',
+    // On Android we need to ensure the drawer doesn't overlap the status bar
+    ...Platform.select({
+      android: {
+        height: StatusBar.currentHeight,
+      },
+    }),
+  },
+  safeAreaContent: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  userInfoSection: {
+    flexDirection: 'row',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+    alignItems: 'center',
   },
   avatar: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    borderWidth: 2,
-    borderColor: Colors.white,
+    marginRight: 16,
   },
-  userInfo: {
-    marginLeft: 15,
+  userDetails: {
+    flex: 1,
   },
-  name: {
+  userName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.white,
+    color: '#333',
   },
-  email: {
-    fontSize: 12,
-    color: Colors.white,
-    opacity: 0.8,
-    marginBottom: 5,
+  userEmail: {
+    fontSize: 14,
+    color: '#777',
+    marginTop: 2,
   },
-  userTypeContainer: {
+  ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    alignSelf: 'flex-start',
+    marginTop: 4,
   },
-  userTypeText: {
-    color: Colors.white,
-    fontSize: 10,
-    marginLeft: 3,
+  ratingText: {
+    fontSize: 14,
+    color: '#555',
+    marginLeft: 4,
   },
-  drawerSection: {
-    marginTop: 10,
+  menuSection: {
+    flex: 1,
+    paddingTop: 8,
   },
-  drawerItem: {
-    borderRadius: 10,
-    marginVertical: 0,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.lightGray,
-    marginVertical: 10,
-    marginHorizontal: 20,
-  },
-  logoutButton: {
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 20,
-    marginTop: 20,
-    marginBottom: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  menuItemText: {
+    fontSize: 15,
+    color: '#333',
+    marginLeft: 16,
+  },
+  bottomSection: {
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    paddingVertical: 8,
+  },
+  logoutItem: {
+    marginTop: 4,
   },
   logoutText: {
-    marginLeft: 30,
-    color: Colors.error,
-    fontWeight: 'bold',
-  },
-  versionContainer: {
-    marginTop: 20,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  versionText: {
-    fontSize: 12,
-    color: Colors.darkGray,
-  },
+    color: '#E53935',
+  }
 });
 
-export default DrawerContent;
+export default AppNavigator;

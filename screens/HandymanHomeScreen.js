@@ -1,6 +1,6 @@
-// Full HandymanHomeScreen.js Implementation with Navigation
+// Enhanced HandymanHomeScreen.js Implementation with Navigation
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -64,29 +64,29 @@ const HandymanHomeScreen = ({ navigation }) => {
     return true;
   });
 
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     // Simulate API call
     setTimeout(() => {
       setRefreshing(false);
     }, 1000);
-  };
+  }, []);
 
-  const handleAcceptProject = (projectId) => {
-    setProjectRequests(
-      projectRequests.map((project) =>
+  const handleAcceptProject = useCallback((projectId) => {
+    setProjectRequests(prevProjects =>
+      prevProjects.map((project) =>
         project.id === projectId ? { ...project, status: 'Accepted' } : project
       )
     );
-  };
+  }, []);
 
-  const handleDeclineProject = (projectId) => {
-    setProjectRequests(
-      projectRequests.filter((project) => project.id !== projectId)
+  const handleDeclineProject = useCallback((projectId) => {
+    setProjectRequests(prevProjects =>
+      prevProjects.filter((project) => project.id !== projectId)
     );
-  };
+  }, []);
 
-  const getCategoryIcon = (category) => {
+  const getCategoryIcon = useCallback((category) => {
     switch (category.toLowerCase()) {
       case 'plumbing':
         return 'water-outline';
@@ -101,21 +101,21 @@ const HandymanHomeScreen = ({ navigation }) => {
       default:
         return 'construct-outline';
     }
-  };
+  }, []);
 
   // Navigation function to view project details
-  const handleViewProjectDetails = (project) => {
+  const handleViewProjectDetails = useCallback((project) => {
     navigation.navigate('ProjectDetails', { project });
-  };
+  }, [navigation]);
 
-  const renderProjectItem = ({ item }) => (
+  const renderProjectItem = useCallback(({ item }) => (
     <TouchableOpacity 
       style={styles.projectCard}
       onPress={() => handleViewProjectDetails(item)}
       activeOpacity={0.7}
     >
       <View style={styles.cardHeader}>
-        <View style={styles.categoryBadge}>
+        <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(item.category) }]}>
           <Ionicons name={getCategoryIcon(item.category)} size={16} color="#FFF" />
         </View>
         <Text style={styles.projectTitle} numberOfLines={1}>{item.title}</Text>
@@ -165,7 +165,10 @@ const HandymanHomeScreen = ({ navigation }) => {
         <View style={styles.cardActions}>
           <TouchableOpacity 
             style={styles.messageButton}
-            onPress={() => navigation.navigate('Chat', { recipient: { name: item.clientName, id: item.id } })}
+            onPress={() => navigation.navigate('ChatTab', {
+              screen: 'Chat', 
+              params: { recipient: { name: item.clientName, id: item.id } }
+            })}
           >
             <Ionicons name="chatbubble-outline" size={16} color="#FFF" />
             <Text style={styles.messageButtonText}>Message Client</Text>
@@ -173,7 +176,24 @@ const HandymanHomeScreen = ({ navigation }) => {
         </View>
       )}
     </TouchableOpacity>
-  );
+  ), [getCategoryIcon, handleViewProjectDetails, handleAcceptProject, handleDeclineProject, navigation]);
+
+  const getCategoryColor = (category) => {
+    switch (category.toLowerCase()) {
+      case 'plumbing':
+        return '#2196F3';
+      case 'electrical':
+        return '#FF9800';
+      case 'painting':
+        return '#9C27B0';
+      case 'carpentry':
+        return '#795548';
+      case 'landscaping':
+        return '#4CAF50';
+      default:
+        return Colors.primary;
+    }
+  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -188,15 +208,6 @@ const HandymanHomeScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
-      
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>TooKang</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('ProfileTab')}>
-          <View style={styles.profileButton}>
-            <Ionicons name="person-outline" size={22} color={Colors.primary} />
-          </View>
-        </TouchableOpacity>
-      </View>
       
       <View style={styles.tabs}>
         {['New', 'Accepted', 'Completed'].map((tab) => (
@@ -226,11 +237,16 @@ const HandymanHomeScreen = ({ navigation }) => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={renderEmptyState}
+        initialNumToRender={5}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews={true}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             colors={[Colors.primary]}
+            tintColor={Colors.primary}
           />
         }
       />
@@ -243,40 +259,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F8F8',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.primary,
-  },
-  profileButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F0F7FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   tabs: {
     flexDirection: 'row',
     backgroundColor: '#FFF',
     paddingTop: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#EEEEEE',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
-    paddingBottom: 12,
+    paddingVertical: 12,
   },
   activeTab: {
     borderBottomWidth: 2,
