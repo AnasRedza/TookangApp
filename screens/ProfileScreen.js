@@ -7,16 +7,17 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import Colors from '../constants/Colors';
 
 const ProfileScreen = ({ navigation }) => {
-  // Get logout function and user type
+  // Get auth context
   const { logout, userType } = useAuth();
   
-  // Mock user data
+  // Mock user data - in a real app, this would come from a context or API
   const [user] = useState({
     name: 'John Smith',
     email: 'john.smith@example.com',
@@ -32,14 +33,26 @@ const ProfileScreen = ({ navigation }) => {
       : 'Looking for reliable handymen for home improvement projects.',
     skills: userType === 'handyman' ? ['Plumbing', 'Electrical', 'Carpentry'] : [],
     hourlyRate: userType === 'handyman' ? 35 : null,
+    verified: true,
   });
 
-  const handleLogout = () => {
-    logout();
-  };
-  
   const handleEditProfile = () => {
     navigation.navigate('EditProfile', { userData: user });
+  };
+  
+  const handleNavigateToSettings = () => {
+    navigation.navigate('Settings');
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Logout",
+      "Are you sure you want to logout?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Logout", onPress: () => logout() }
+      ]
+    );
   };
 
   const renderSectionTitle = (title) => (
@@ -77,7 +90,14 @@ const ProfileScreen = ({ navigation }) => {
       <ScrollView style={styles.container}>
         {/* Header with basic info */}
         <View style={styles.header}>
-          <Image source={{ uri: user.avatar }} style={styles.avatar} />
+          <View style={styles.avatarContainer}>
+            <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            {user.verified && (
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
+              </View>
+            )}
+          </View>
           
           <View style={styles.userInfo}>
             <Text style={styles.name}>{user.name}</Text>
@@ -154,7 +174,7 @@ const ProfileScreen = ({ navigation }) => {
 
         {/* Actions */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Settings')}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleNavigateToSettings}>
             <Ionicons name="settings-outline" size={22} color="#666" />
             <Text style={styles.actionText}>Settings</Text>
             <Ionicons name="chevron-forward" size={18} color="#CCC" style={styles.actionArrow} />
@@ -163,6 +183,12 @@ const ProfileScreen = ({ navigation }) => {
           <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Help')}>
             <Ionicons name="help-circle-outline" size={22} color="#666" />
             <Text style={styles.actionText}>Help & Support</Text>
+            <Ionicons name="chevron-forward" size={18} color="#CCC" style={styles.actionArrow} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('PaymentMethods')}>
+            <Ionicons name="card-outline" size={22} color="#666" />
+            <Text style={styles.actionText}>Payment Methods</Text>
             <Ionicons name="chevron-forward" size={18} color="#CCC" style={styles.actionArrow} />
           </TouchableOpacity>
           
@@ -195,11 +221,22 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 10,
   },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 14,
+  },
   avatar: {
     width: 70,
     height: 70,
     borderRadius: 35,
-    marginRight: 14,
+  },
+  verifiedBadge: {
+    position: 'absolute',
+    bottom: -5,
+    right: -5,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 2,
   },
   userInfo: {
     flex: 1,

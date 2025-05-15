@@ -1,7 +1,5 @@
-// Full AppNavigator.js with ProjectDetailScreen added
-
 import React from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
@@ -24,7 +22,15 @@ import ChatScreen from '../screens/ChatScreen';
 
 // Import screens for Handyman side
 import HandymanHomeScreen from '../screens/HandymanHomeScreen';
-import ProjectDetailScreen from '../screens/ProjectDetailScreen'; // Added import for ProjectDetailScreen
+import ProjectDetailScreen from '../screens/ProjectDetailScreen';
+
+// Import settings screens
+import SettingsScreen from '../screens/SettingsScreen';
+import LanguageSettingsScreen from '../screens/LanguageSettingsScreen';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
+import HelpCenterScreen from '../screens/HelpCenterScreen';
+import ContactSupportScreen from '../screens/ContactSupportScreen';
 
 // Import auth screens
 import LoginScreen from '../screens/LoginScreen';
@@ -65,7 +71,57 @@ function ChatStack() {
       <Stack.Screen 
         name="Chat" 
         component={ChatScreen} 
-        options={{ title: '' }} 
+        options={({ route }) => ({ 
+          title: route.params?.recipient?.name || '' 
+        })} 
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Settings stack navigator
+function SettingsStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: Colors.primary,
+        },
+        headerTintColor: Colors.white,
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      }}
+    >
+      <Stack.Screen 
+        name="SettingsMain" 
+        component={SettingsScreen} 
+        options={{ title: 'Settings' }} 
+      />
+      <Stack.Screen 
+        name="LanguageSettings" 
+        component={LanguageSettingsScreen} 
+        options={{ title: 'Language' }} 
+      />
+      <Stack.Screen 
+        name="ChangePassword" 
+        component={ChangePasswordScreen} 
+        options={{ title: 'Change Password' }} 
+      />
+      <Stack.Screen 
+        name="PrivacyPolicy" 
+        component={PrivacyPolicyScreen} 
+        options={{ title: 'Privacy Policy' }} 
+      />
+      <Stack.Screen 
+        name="HelpCenter" 
+        component={HelpCenterScreen} 
+        options={{ title: 'Help Center' }} 
+      />
+      <Stack.Screen 
+        name="ContactSupport" 
+        component={ContactSupportScreen} 
+        options={{ title: 'Contact Support' }} 
       />
     </Stack.Navigator>
   );
@@ -94,6 +150,11 @@ function ProfileStack() {
         name="EditProfile" 
         component={EditProfileScreen} 
         options={{ title: 'Edit Profile' }} 
+      />
+      <Stack.Screen 
+        name="Settings" 
+        component={SettingsStack} 
+        options={{ headerShown: false }} 
       />
     </Stack.Navigator>
   );
@@ -173,7 +234,6 @@ function HandymanStack() {
           ),
         })}
       />
-      {/* Added ProjectDetails screen to the Handyman Stack */}
       <Stack.Screen 
         name="ProjectDetails" 
         component={ProjectDetailScreen} 
@@ -341,7 +401,7 @@ const AppNavigator = () => {
   // Show loading indicator while checking authentication state
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
@@ -363,5 +423,14 @@ const AppNavigator = () => {
     </Stack.Navigator>
   );
 };
+
+// Styles
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }
+});
 
 export default AppNavigator;
