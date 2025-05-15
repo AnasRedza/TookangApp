@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,386 +6,416 @@ import {
   TextInput,
   ScrollView,
   TouchableOpacity,
+  Switch,
   Image,
+  ActivityIndicator,
+  Alert,
   Platform,
   KeyboardAvoidingView,
-  Modal,
-  FlatList,
-  Alert
+  SafeAreaView
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 
 const ProjectBidScreen = ({ route, navigation }) => {
-  const { handyman } = route.params || { 
-    handyman: {
-      id: '1',
-      name: 'John Doe',
-      profilePicture: 'https://randomuser.me/api/portraits/men/32.jpg',
-      rating: 4.8,
-      totalReviews: 147,
-      hourlyRate: 45,
-      profession: 'Plumber',
-      location: 'San Francisco, CA'
+  const { handyman } = route.params || {};
+  
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category: '',
+    location: '',
+    initialBudget: '',
+    images: [],
+    isNegotiable: true,
+    preferredDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+    preferredTime: 'morning',
+    notes: ''
+  });
+  
+  const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [categories, setCategories] = useState([
+    'Plumbing', 'Electrical', 'Carpentry', 'Painting', 
+    'Cleaning', 'Landscaping', 'Flooring', 'HVAC', 
+    'Roofing', 'Appliance Repair', 'General Maintenance'
+  ]);
+  
+  // Request camera permissions on component mount
+  useEffect(() => {
+    (async () => {
+      if (Platform.OS !== 'web') {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permission Required',
+            'Sorry, we need camera roll permissions to upload project images!'
+          );
+        }
+      }
+    })();
+  }, []);
+  
+  // Handle form field changes
+  const handleChange = (field, value) => {
+    setFormData({
+      ...formData,
+      [field]: value
+    });
+    
+    // Clear error for this field when user types
+    if (errors[field]) {
+      const newErrors = {...errors};
+      delete newErrors[field];
+      setErrors(newErrors);
     }
   };
   
-  // Form state
-  const [projectTitle, setProjectTitle] = useState('');
-  const [projectDescription, setProjectDescription] = useState('');
-  const [budget, setBudget] = useState('');
-  const [startDate, setStartDate] = useState(new Date());
-  const [attachments, setAttachments] = useState([]);
-  const [paymentType, setPaymentType] = useState('hourly');
+  // Handle category selection
+  const handleCategorySelect = (category) => {
+    handleChange('category', category);
+  };
   
-  // Modal state
-  const [datePickerVisible, setDatePickerVisible] = useState(false);
-  const [photoOptionsVisible, setPhotoOptionsVisible] = useState(false);
+  // Handle date change
+  const handleDateChange = (event, selectedDate) => {
+    const currentDate = selectedDate || formData.preferredDate;
+    setShowDatePicker(Platform.OS === 'ios');
+    handleChange('preferredDate', currentDate);
+  };
+  
+  // Handle image picking
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+    
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      handleChange('images', [...formData.images, result.assets[0].uri]);
+    }
+  };
+  
+  // Handle removing an image
+  const removeImage = (index) => {
+    const newImages = [...formData.images];
+    newImages.splice(index, 1);
+    handleChange('images', newImages);
+  };
+  
+  // Validate the form
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.title.trim()) {
+      newErrors.title = 'Project title is required';
+    }
+    
+    if (!formData.description.trim()) {
+      newErrors.description = 'Project description is required';
+    } else if (formData.description.trim().length < 20) {
+      newErrors.description = 'Please provide a more detailed description';
+    }
+    
+    if (!formData.category) {
+      newErrors.category = 'Please select a category';
+    }
+    
+    if (!formData.initialBudget) {
+      newErrors.initialBudget = 'Please enter your budget';
+    } else if (isNaN(formData.initialBudget) || parseFloat(formData.initialBudget) <= 0) {
+      newErrors.initialBudget = 'Please enter a valid amount';
+    }
+    
+    if (!formData.location.trim()) {
+      newErrors.location = 'Service location is required';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+  
+  // Handle form submission
+  const handleSubmit = () => {
+    if (validateForm()) {
+      setIsLoading(true);
+      
+      // Simulate API call to create project
+      setTimeout(() => {
+        setIsLoading(false);
+        
+        // Navigate to success or next step
+        Alert.alert(
+          'Project Bid Submitted',
+          'Your project bid has been sent. You will be notified when handymen respond.',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('MyProjects')
+            }
+          ]
+        );
+      }, 1500);
+    }
+  };
   
   // Format date for display
   const formatDate = (date) => {
-    const options = { year: 'numeric', month: 'short', day: 'numeric' };
-    return date.toLocaleDateString('en-US', options);
+    const options = { weekday: 'short', month: 'short', day: 'numeric' };
+    return date.toLocaleDateString(undefined, options);
   };
-  
-  // Handle date selection
-  const handleSelectDate = (daysToAdd) => {
-    const newDate = new Date();
-    newDate.setDate(newDate.getDate() + daysToAdd);
-    setStartDate(newDate);
-    setDatePickerVisible(false);
-  };
-  
-  // Mock function to add a photo
-  const handleAddPhoto = (source) => {
-    setPhotoOptionsVisible(false);
-    
-    // Mock photo URLs for demo purposes
-    const mockPhotos = [
-      'https://images.unsplash.com/photo-1581783898377-1c85bf937427',
-      'https://images.unsplash.com/photo-1556911220-e15b29be8c8f',
-      'https://images.unsplash.com/photo-1584622781564-1d987f7333c1',
-    ];
-    
-    const newPhoto = {
-      id: Date.now().toString(),
-      uri: mockPhotos[Math.floor(Math.random() * mockPhotos.length)]
-    };
-    
-    setAttachments([...attachments, newPhoto]);
-  };
-  
-  // Remove a photo
-  const handleRemovePhoto = (id) => {
-    setAttachments(attachments.filter(photo => photo.id !== id));
-  };
-  
-  // Submit the project bid
-  const handleSubmit = () => {
-    // Validate required fields
-    if (!projectTitle.trim()) {
-      Alert.alert('Please enter a project title');
-      return;
-    }
-    
-    if (!projectDescription.trim()) {
-      Alert.alert('Please enter a project description');
-      return;
-    }
-    
-    if (paymentType !== 'quote' && !budget.trim()) {
-      Alert.alert('Please enter your budget');
-      return;
-    }
-    
-    // Create project data
-    const projectData = {
-      title: projectTitle,
-      description: projectDescription,
-      budget: paymentType === 'quote' ? 'Quote requested' : budget,
-      paymentType,
-      startDate: startDate.toISOString(),
-      attachments,
-      handymanId: handyman.id,
-      status: 'pending'
-    };
-    
-    // Submit to API (mock)
-    console.log('Submitting project:', projectData);
-    
-    // Show success message and navigate
-    Alert.alert(
-      'Project Submitted',
-      'Your project has been sent to the handyman',
-      [
-        {
-          text: 'View My Projects',
-          onPress: () => navigation.navigate('MyProjects')
-        },
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack()
-        }
-      ]
-    );
-  };
-
-  // Render payment type option
-  const renderPaymentOption = (type, title, description) => (
-    <TouchableOpacity
-      style={[
-        styles.paymentOption,
-        paymentType === type && styles.paymentOptionSelected
-      ]}
-      onPress={() => setPaymentType(type)}
-    >
-      <View style={styles.radioContainer}>
-        <View style={styles.radioOuter}>
-          {paymentType === type && <View style={styles.radioInner} />}
-        </View>
-      </View>
-      <View style={styles.paymentOptionContent}>
-        <Text style={styles.paymentOptionTitle}>{title}</Text>
-        <Text style={styles.paymentOptionDescription}>{description}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  // Date picker modal
-  const renderDatePickerModal = () => (
-    <Modal
-      visible={datePickerVisible}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setDatePickerVisible(false)}
-    >
-      <TouchableOpacity 
-        style={styles.modalOverlay} 
-        activeOpacity={1}
-        onPress={() => setDatePickerVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Start Date</Text>
-            <TouchableOpacity onPress={() => setDatePickerVisible(false)}>
-              <Ionicons name="close" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView>
-            <TouchableOpacity style={styles.dateOption} onPress={() => handleSelectDate(0)}>
-              <Text style={styles.dateOptionTitle}>Today</Text>
-              <Text style={styles.dateOptionSubtitle}>{formatDate(new Date())}</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.dateOption} onPress={() => handleSelectDate(1)}>
-              <Text style={styles.dateOptionTitle}>Tomorrow</Text>
-              <Text style={styles.dateOptionSubtitle}>{formatDate(new Date(Date.now() + 86400000))}</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.dateOption} onPress={() => handleSelectDate(7)}>
-              <Text style={styles.dateOptionTitle}>Next week</Text>
-              <Text style={styles.dateOptionSubtitle}>{formatDate(new Date(Date.now() + 86400000 * 7))}</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.dateOption} onPress={() => handleSelectDate(14)}>
-              <Text style={styles.dateOptionTitle}>In two weeks</Text>
-              <Text style={styles.dateOptionSubtitle}>{formatDate(new Date(Date.now() + 86400000 * 14))}</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.dateOption} onPress={() => handleSelectDate(30)}>
-              <Text style={styles.dateOptionTitle}>In a month</Text>
-              <Text style={styles.dateOptionSubtitle}>{formatDate(new Date(Date.now() + 86400000 * 30))}</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  );
-
-  // Photo options modal
-  const renderPhotoOptionsModal = () => (
-    <Modal
-      visible={photoOptionsVisible}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setPhotoOptionsVisible(false)}
-    >
-      <TouchableOpacity 
-        style={styles.modalOverlay} 
-        activeOpacity={1}
-        onPress={() => setPhotoOptionsVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Add Photo</Text>
-            <TouchableOpacity onPress={() => setPhotoOptionsVisible(false)}>
-              <Ionicons name="close" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-          
-          <TouchableOpacity style={styles.modalOption} onPress={() => handleAddPhoto('camera')}>
-            <Ionicons name="camera-outline" size={24} color={Colors.primary} />
-            <Text style={styles.modalOptionText}>Take Photo</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.modalOption} onPress={() => handleAddPhoto('gallery')}>
-            <Ionicons name="images-outline" size={24} color={Colors.primary} />
-            <Text style={styles.modalOptionText}>Choose from Gallery</Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  );
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <ScrollView>
-        {/* Handyman info */}
-        <View style={styles.handymanCard}>
-          <Image source={{ uri: handyman.profilePicture }} style={styles.handymanImage} />
-          <View style={styles.handymanInfo}>
-            <Text style={styles.handymanName}>{handyman.name}</Text>
-            <View style={styles.handymanRating}>
-              <Ionicons name="star" size={16} color="#FFD700" />
-              <Text style={styles.ratingText}>{handyman.rating}</Text>
-            </View>
-            <Text style={styles.rateText}>RM{handyman.hourlyRate}/hr</Text>
-          </View>
-        </View>
-
-        {/* Project details */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Project Details</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Project Title <Text style={styles.required}>*</Text></Text>
-            <TextInput 
-              style={styles.input}
-              value={projectTitle}
-              onChangeText={setProjectTitle}
-              placeholder="What needs to be done?"
-              placeholderTextColor="#999"
-            />
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        <ScrollView style={styles.scrollView}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Create Project Bid</Text>
+            <Text style={styles.headerSubtitle}>
+              {handyman 
+                ? `Request service from ${handyman.name}` 
+                : 'Post your project and receive bids from handymen'}
+            </Text>
           </View>
           
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Description <Text style={styles.required}>*</Text></Text>
-            <TextInput 
-              style={[styles.input, styles.textArea]}
-              value={projectDescription}
-              onChangeText={setProjectDescription}
-              placeholder="Describe what you need help with..."
-              placeholderTextColor="#999"
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-          </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Start Date</Text>
-            <TouchableOpacity 
-              style={styles.dateButton}
-              onPress={() => setDatePickerVisible(true)}
-            >
-              <Text style={styles.dateButtonText}>{formatDate(startDate)}</Text>
-              <Ionicons name="calendar-outline" size={20} color="#666" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Payment options */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Payment</Text>
-          
-          <View style={styles.paymentOptions}>
-            {renderPaymentOption('hourly', 'Hourly Rate', 'Pay based on time spent')}
-            {renderPaymentOption('fixed', 'Fixed Price', 'Pay a single agreed price')}
-            {renderPaymentOption('quote', 'Request Quote', 'Ask for pricing first')}
-          </View>
-          
-          {paymentType !== 'quote' && (
+          {/* Project Details Form */}
+          <View style={styles.formContainer}>
+            {/* Project Title */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>
-                {paymentType === 'hourly' ? 'Budget per Hour (RM)' : 'Total Budget (RM)'}
-                <Text style={styles.required}>*</Text>
+              <Text style={styles.inputLabel}>Project Title</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  errors.title && styles.inputError
+                ]}
+                placeholder="Give your project a clear title"
+                value={formData.title}
+                onChangeText={(text) => handleChange('title', text)}
+              />
+              {errors.title && (
+                <Text style={styles.errorText}>{errors.title}</Text>
+              )}
+            </View>
+            
+            {/* Project Description */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Project Description</Text>
+              <TextInput
+                style={[
+                  styles.textArea,
+                  errors.description && styles.inputError
+                ]}
+                placeholder="Describe what you need done in detail"
+                multiline
+                numberOfLines={5}
+                value={formData.description}
+                onChangeText={(text) => handleChange('description', text)}
+              />
+              {errors.description && (
+                <Text style={styles.errorText}>{errors.description}</Text>
+              )}
+            </View>
+            
+            {/* Project Category */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Category</Text>
+              {errors.category && (
+                <Text style={styles.errorText}>{errors.category}</Text>
+              )}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoriesContainer}
+              >
+                {categories.map((category) => (
+                  <TouchableOpacity
+                    key={category}
+                    style={[
+                      styles.categoryChip,
+                      formData.category === category && styles.selectedCategoryChip
+                    ]}
+                    onPress={() => handleCategorySelect(category)}
+                  >
+                    <Text style={[
+                      styles.categoryText,
+                      formData.category === category && styles.selectedCategoryText
+                    ]}>
+                      {category}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+            
+            {/* Project Budget */}
+            <View style={styles.inputGroup}>
+              <View style={styles.budgetHeader}>
+                <Text style={styles.inputLabel}>Your Budget (RM)</Text>
+                <View style={styles.switchContainer}>
+                  <Text style={styles.switchLabel}>Negotiable</Text>
+                  <Switch
+                    value={formData.isNegotiable}
+                    onValueChange={(value) => handleChange('isNegotiable', value)}
+                    trackColor={{ false: '#D1D1D1', true: `${Colors.primary}80` }}
+                    thumbColor={formData.isNegotiable ? Colors.primary : '#F4F4F4'}
+                  />
+                </View>
+              </View>
+              <TextInput
+                style={[
+                  styles.input,
+                  errors.initialBudget && styles.inputError
+                ]}
+                placeholder="Enter your budget"
+                keyboardType="numeric"
+                value={formData.initialBudget}
+                onChangeText={(text) => handleChange('initialBudget', text)}
+              />
+              {errors.initialBudget && (
+                <Text style={styles.errorText}>{errors.initialBudget}</Text>
+              )}
+              <Text style={styles.budgetNote}>
+                {formData.isNegotiable 
+                  ? 'Handymen may propose different rates based on project requirements'
+                  : 'Only handymen willing to work with this budget will respond'}
               </Text>
-              <View style={styles.budgetInputContainer}>
-                <Text style={styles.currencySymbol}>RM</Text>
-                <TextInput 
-                  style={styles.budgetInput}
-                  value={budget}
-                  onChangeText={(text) => setBudget(text.replace(/[^0-9.]/g, ''))}
-                  placeholder="0.00"
-                  placeholderTextColor="#999"
-                  keyboardType="decimal-pad"
+            </View>
+            
+            {/* Service Location */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Service Location</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  errors.location && styles.inputError
+                ]}
+                placeholder="Enter the address for service"
+                value={formData.location}
+                onChangeText={(text) => handleChange('location', text)}
+              />
+              {errors.location && (
+                <Text style={styles.errorText}>{errors.location}</Text>
+              )}
+            </View>
+            
+            {/* Preferred Date */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Preferred Date</Text>
+              <TouchableOpacity
+                style={styles.datePickerButton}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={styles.dateText}>{formatDate(formData.preferredDate)}</Text>
+                <Ionicons name="calendar-outline" size={22} color="#666" />
+              </TouchableOpacity>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={formData.preferredDate}
+                  mode="date"
+                  display="default"
+                  minimumDate={new Date()}
+                  onChange={handleDateChange}
                 />
+              )}
+            </View>
+            
+            {/* Preferred Time */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Preferred Time</Text>
+              <View style={styles.timeOptionsContainer}>
+                {['morning', 'afternoon', 'evening', 'anytime'].map((time) => (
+                  <TouchableOpacity
+                    key={time}
+                    style={[
+                      styles.timeOption,
+                      formData.preferredTime === time && styles.selectedTimeOption
+                    ]}
+                    onPress={() => handleChange('preferredTime', time)}
+                  >
+                    <Text style={[
+                      styles.timeOptionText,
+                      formData.preferredTime === time && styles.selectedTimeOptionText
+                    ]}>
+                      {time.charAt(0).toUpperCase() + time.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
-          )}
-        </View>
-
-        {/* Photos */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Photos</Text>
-          <Text style={styles.helpText}>Add photos to help explain your project</Text>
-          
-          <TouchableOpacity
-            style={styles.addPhotoButton}
-            onPress={() => setPhotoOptionsVisible(true)}
-          >
-            <Ionicons name="camera-outline" size={24} color={Colors.primary} />
-            <Text style={styles.addPhotoText}>Add Photo</Text>
-          </TouchableOpacity>
-          
-          {attachments.length > 0 && (
-            <FlatList
-              data={attachments}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.photoContainer}>
-                  <Image source={{ uri: item.uri }} style={styles.photo} />
+            
+            {/* Project Images */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Project Images (Optional)</Text>
+              <Text style={styles.imageNote}>
+                Add photos to help handymen understand your project
+              </Text>
+              
+              <View style={styles.imagesContainer}>
+                {formData.images.map((image, index) => (
+                  <View key={index} style={styles.imagePreviewContainer}>
+                    <Image source={{ uri: image }} style={styles.imagePreview} />
+                    <TouchableOpacity
+                      style={styles.removeImageButton}
+                      onPress={() => removeImage(index)}
+                    >
+                      <Ionicons name="close-circle" size={24} color="#E53935" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                
+                {formData.images.length < 5 && (
                   <TouchableOpacity
-                    style={styles.removePhotoButton}
-                    onPress={() => handleRemovePhoto(item.id)}
+                    style={styles.addImageButton}
+                    onPress={pickImage}
                   >
-                    <Ionicons name="close-circle" size={22} color={Colors.primary} />
+                    <Ionicons name="camera-outline" size={40} color="#999" />
+                    <Text style={styles.addImageText}>Add Photo</Text>
                   </TouchableOpacity>
-                </View>
-              )}
-              style={styles.photosList}
-            />
-          )}
+                )}
+              </View>
+            </View>
+            
+            {/* Additional Notes */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Additional Notes (Optional)</Text>
+              <TextInput
+                style={styles.textArea}
+                placeholder="Any other details handymen should know?"
+                multiline
+                numberOfLines={3}
+                value={formData.notes}
+                onChangeText={(text) => handleChange('notes', text)}
+              />
+            </View>
+          </View>
+          
+          <View style={styles.bottomSpace} />
+        </ScrollView>
+        
+        {/* Submit Button */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.submitButton}
+            onPress={handleSubmit}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.submitButtonText}>Submit Project Bid</Text>
+            )}
+          </TouchableOpacity>
         </View>
-
-        {/* Privacy note */}
-        <View style={styles.privacyNote}>
-          <Ionicons name="shield-checkmark-outline" size={18} color="#777" />
-          <Text style={styles.privacyText}>
-            Your contact details will only be shared with the handyman after you accept their quote.
-          </Text>
-        </View>
-
-        {/* Submit button */}
-        <TouchableOpacity 
-          style={styles.submitButton}
-          onPress={handleSubmit}
-        >
-          <Text style={styles.submitButtonText}>Submit Project</Text>
-        </TouchableOpacity>
-      </ScrollView>
-      
-      {/* Modals */}
-      {renderDatePickerModal()}
-      {renderPhotoOptionsModal()}
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -394,282 +424,220 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F8F8',
   },
-  handymanCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
-  },
-  handymanImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
-  },
-  handymanInfo: {
+  scrollView: {
     flex: 1,
   },
-  handymanName: {
-    fontSize: 16,
+  header: {
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+  },
+  headerTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 2,
-  },
-  handymanRating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  ratingText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
-  },
-  rateText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-  formSection: {
-    backgroundColor: '#FFF',
-    padding: 16,
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#555',
+    color: '#333333',
     marginBottom: 8,
   },
-  required: {
-    color: '#E53935',
-    fontWeight: 'bold',
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#666666',
+    lineHeight: 22,
+  },
+  formContainer: {
+    padding: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 8,
   },
   input: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#DDD',
+    borderColor: '#DDDDDD',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     fontSize: 16,
-    color: '#333',
-    backgroundColor: '#FAFAFA',
+  },
+  inputError: {
+    borderColor: '#E53935',
   },
   textArea: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DDDDDD',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
     minHeight: 100,
-    paddingTop: 12,
+    textAlignVertical: 'top',
   },
-  dateButton: {
+  errorText: {
+    color: '#E53935',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  categoriesContainer: {
+    paddingVertical: 8,
+  },
+  categoryChip: {
+    backgroundColor: '#F1F1F1',
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#DDDDDD',
+  },
+  selectedCategoryChip: {
+    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+    borderColor: Colors.primary,
+  },
+  categoryText: {
+    fontSize: 14,
+    color: '#555555',
+  },
+  selectedCategoryText: {
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  budgetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 8,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  switchLabel: {
+    fontSize: 14,
+    color: '#666666',
+    marginRight: 8,
+  },
+  budgetNote: {
+    fontSize: 12,
+    color: '#888888',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  datePickerButton: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#DDD',
+    borderColor: '#DDDDDD',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    backgroundColor: '#FAFAFA',
-  },
-  dateButtonText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  paymentOptions: {
-    marginBottom: 16,
-  },
-  paymentOption: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#DDD',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
   },
-  paymentOptionSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: 'rgba(52, 152, 219, 0.05)',
+  dateText: {
+    fontSize: 16,
+    color: '#333333',
   },
-  radioContainer: {
-    marginRight: 12,
-  },
-  radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.primary,
-  },
-  paymentOptionContent: {
-    flex: 1,
-  },
-  paymentOptionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 2,
-  },
-  paymentOptionDescription: {
-    fontSize: 13,
-    color: '#777',
-  },
-  budgetInputContainer: {
+  timeOptionsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginHorizontal: -4,
+  },
+  timeOption: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#DDD',
+    borderColor: '#DDDDDD',
     borderRadius: 8,
-    backgroundColor: '#FAFAFA',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    margin: 4,
   },
-  currencySymbol: {
-    paddingLeft: 12,
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#777',
+  selectedTimeOption: {
+    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+    borderColor: Colors.primary,
   },
-  budgetInput: {
-    flex: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#333',
-  },
-  helpText: {
+  timeOptionText: {
     fontSize: 14,
-    color: '#777',
-    marginBottom: 16,
+    color: '#555555',
   },
-  addPhotoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    borderStyle: 'dashed',
-    borderRadius: 8,
-    paddingVertical: 16,
-    backgroundColor: 'rgba(52, 152, 219, 0.05)',
-  },
-  addPhotoText: {
-    fontSize: 16,
+  selectedTimeOptionText: {
     color: Colors.primary,
-    marginLeft: 8,
+    fontWeight: '600',
   },
-  photosList: {
-    marginTop: 16,
+  imageNote: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 12,
   },
-  photoContainer: {
-    marginRight: 10,
+  imagesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -5,
+  },
+  imagePreviewContainer: {
+    width: 100,
+    height: 100,
+    margin: 5,
     position: 'relative',
   },
-  photo: {
-    width: 80,
-    height: 80,
+  imagePreview: {
+    width: '100%',
+    height: '100%',
     borderRadius: 8,
   },
-  removePhotoButton: {
+  removeImageButton: {
     position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#FFF',
+    top: -10,
+    right: -10,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
   },
-  privacyNote: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(52, 152, 219, 0.08)',
-    padding: 12,
+  addImageButton: {
+    width: 100,
+    height: 100,
+    backgroundColor: '#F1F1F1',
     borderRadius: 8,
-    marginHorizontal: 16,
-    marginVertical: 16,
+    margin: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#DDDDDD',
+    borderStyle: 'dashed',
   },
-  privacyText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#555',
-    marginLeft: 10,
+  addImageText: {
+    fontSize: 12,
+    color: '#888888',
+    marginTop: 4,
+  },
+  bottomSpace: {
+    height: 80,
+  },
+  buttonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#EEEEEE',
   },
   submitButton: {
     backgroundColor: Colors.primary,
-    borderRadius: 8,
-    padding: 16,
-    margin: 16,
+    borderRadius: 10,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 30,
   },
   submitButtonText: {
-    color: '#FFF',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingBottom: Platform.OS === 'ios' ? 35 : 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  modalOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
-  },
-  modalOptionText: {
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 16,
-  },
-  dateOption: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
-  },
-  dateOptionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  dateOptionSubtitle: {
-    fontSize: 14,
-    color: '#777',
   },
 });
 

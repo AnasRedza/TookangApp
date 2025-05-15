@@ -7,6 +7,8 @@ import {
   Image,
   ScrollView,
   SafeAreaView,
+  StatusBar,
+  Platform,
   ActivityIndicator
 } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -26,9 +28,20 @@ import EditProfileScreen from '../screens/EditProfileScreen';
 import ChatListScreen from '../screens/ChatListScreen';
 import ChatScreen from '../screens/ChatScreen';
 
+// Import payment screens
+import PaymentScreen from '../screens/PaymentScreen';
+import PaymentSuccessScreen from '../screens/PaymentSuccessScreen';
+import PaymentMethodsScreen from '../screens/PaymentMethodsScreen';
+import TransactionHistoryScreen from '../screens/TransactionHistoryScreen';
+import AdjustmentApprovalScreen from '../screens/AdjustmentApprovalScreen';
+
 // Import screens for Handyman side
 import HandymanHomeScreen from '../screens/HandymanHomeScreen';
 import ProjectDetailScreen from '../screens/ProjectDetailScreen';
+import ProjectOfferScreen from '../screens/ProjectOfferScreen';
+import BudgetAdjustmentScreen from '../screens/BudgetAdjustmentScreen';
+import EarningsScreen from '../screens/EarningsScreen';
+import WithdrawalScreen from '../screens/WithdrawalScreen';
 
 // Import settings screens
 import SettingsScreen from '../screens/SettingsScreen';
@@ -40,8 +53,10 @@ import ContactSupportScreen from '../screens/ContactSupportScreen';
 
 // Import auth screens
 import LoginScreen from '../screens/LoginScreen';
+import RegisterScreen from '../screens/RegisterScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 
-// Define DrawerContent component inline
+// Define DrawerContent component with proper status bar handling
 const DrawerContent = ({ navigation }) => {
   const { userType, logout } = useAuth();
   
@@ -53,7 +68,7 @@ const DrawerContent = ({ navigation }) => {
     rating: userType === 'handyman' ? 4.8 : null,
   };
 
-  // Helper function to navigate to the correct tab via the tab navigator
+  // Navigation helper functions
   const navigateToTab = (tabName) => {
     navigation.navigate(userType === 'handyman' ? 'HandymanTabs' : 'CustomerTabs', {
       screen: tabName
@@ -61,7 +76,6 @@ const DrawerContent = ({ navigation }) => {
     navigation.closeDrawer();
   };
 
-  // Helper function to navigate to a nested screen within a tab
   const navigateToNestedScreen = (tabName, screenName, params = {}) => {
     navigation.navigate(userType === 'handyman' ? 'HandymanTabs' : 'CustomerTabs', {
       screen: tabName,
@@ -74,90 +88,122 @@ const DrawerContent = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.drawerContainer}>
-      <View style={styles.userInfoSection}>
-        <Image source={{ uri: user.avatar }} style={styles.avatar} />
-        <View style={styles.userDetails}>
-          <Text style={styles.userName}>{user.name}</Text>
-          <Text style={styles.userEmail}>{user.email}</Text>
-          {userType === 'handyman' && (
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={16} color="#FFC107" />
-              <Text style={styles.ratingText}>{user.rating}</Text>
-            </View>
-          )}
+    <View style={styles.drawerContainer}>
+      {/* Status bar handling */}
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      
+      {/* Safe area view for proper status bar handling */}
+      <SafeAreaView style={styles.safeAreaTop} />
+      
+      <SafeAreaView style={styles.safeAreaContent}>
+        <View style={styles.userInfoSection}>
+          <Image source={{ uri: user.avatar }} style={styles.avatar} />
+          <View style={styles.userDetails}>
+            <Text style={styles.userName}>{user.name}</Text>
+            <Text style={styles.userEmail}>{user.email}</Text>
+            {userType === 'handyman' && (
+              <View style={styles.ratingContainer}>
+                <Ionicons name="star" size={16} color="#FFC107" />
+                <Text style={styles.ratingText}>{user.rating}</Text>
+              </View>
+            )}
+          </View>
         </View>
-      </View>
-      
-      <ScrollView style={styles.menuSection}>
-        {/* Dashboard/Home */}
-        <TouchableOpacity 
-          style={styles.menuItem}
-          onPress={() => navigateToTab(userType === 'handyman' ? 'Dashboard' : 'HomeTab')}
-        >
-          <Ionicons name="home-outline" size={22} color="#555" />
-          <Text style={styles.menuItemText}>{userType === 'handyman' ? 'Dashboard' : 'Home'}</Text>
-        </TouchableOpacity>
         
-        {/* My Projects */}
-        <TouchableOpacity 
-          style={styles.menuItem}
-          onPress={() => navigateToTab('MyProjects')}
-        >
-          <Ionicons name={userType === 'handyman' ? 'construct-outline' : 'briefcase-outline'} size={22} color="#555" />
-          <Text style={styles.menuItemText}>My Projects</Text>
-        </TouchableOpacity>
+        <ScrollView style={styles.menuSection}>
+          {/* Dashboard/Home */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigateToTab(userType === 'handyman' ? 'Dashboard' : 'HomeTab')}
+          >
+            <Ionicons name="home-outline" size={22} color="#555" />
+            <Text style={styles.menuItemText}>{userType === 'handyman' ? 'Dashboard' : 'Home'}</Text>
+          </TouchableOpacity>
+          
+          {/* My Projects */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigateToTab('MyProjects')}
+          >
+            <Ionicons name={userType === 'handyman' ? 'construct-outline' : 'briefcase-outline'} size={22} color="#555" />
+            <Text style={styles.menuItemText}>My Projects</Text>
+          </TouchableOpacity>
+          
+          {/* Messages */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigateToTab('ChatTab')}
+          >
+            <Ionicons name="chatbubbles-outline" size={22} color="#555" />
+            <Text style={styles.menuItemText}>Messages</Text>
+          </TouchableOpacity>
+          
+          {/* Payment/Earnings */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => {
+              if (userType === 'handyman') {
+                navigateToTab('EarningsTab');
+              } else {
+                navigateToNestedScreen('ProfileTab', 'PaymentMethods');
+              }
+            }}
+          >
+            <Ionicons name={userType === 'handyman' ? 'wallet-outline' : 'card-outline'} size={22} color="#555" />
+            <Text style={styles.menuItemText}>{userType === 'handyman' ? 'Earnings' : 'Payment Methods'}</Text>
+          </TouchableOpacity>
+          
+          {/* Transaction History */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigateToNestedScreen('ProfileTab', 'TransactionHistory')}
+          >
+            <Ionicons name="receipt-outline" size={22} color="#555" />
+            <Text style={styles.menuItemText}>Transaction History</Text>
+          </TouchableOpacity>
+          
+          {/* Profile */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigateToTab('ProfileTab')}
+          >
+            <Ionicons name="person-outline" size={22} color="#555" />
+            <Text style={styles.menuItemText}>Profile</Text>
+          </TouchableOpacity>
+          
+          {/* Settings */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigateToNestedScreen('ProfileTab', 'Settings')}
+          >
+            <Ionicons name="settings-outline" size={22} color="#555" />
+            <Text style={styles.menuItemText}>Settings</Text>
+          </TouchableOpacity>
+          
+          {/* Help & Support */}
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => navigateToNestedScreen('ProfileTab', 'HelpCenter')}
+          >
+            <Ionicons name="help-circle-outline" size={22} color="#555" />
+            <Text style={styles.menuItemText}>Help & Support</Text>
+          </TouchableOpacity>
+        </ScrollView>
         
-        {/* Messages */}
-        <TouchableOpacity 
-          style={styles.menuItem}
-          onPress={() => navigateToTab('ChatTab')}
-        >
-          <Ionicons name="chatbubbles-outline" size={22} color="#555" />
-          <Text style={styles.menuItemText}>Messages</Text>
-        </TouchableOpacity>
-        
-        {/* Profile */}
-        <TouchableOpacity 
-          style={styles.menuItem}
-          onPress={() => navigateToTab('ProfileTab')}
-        >
-          <Ionicons name="person-outline" size={22} color="#555" />
-          <Text style={styles.menuItemText}>Profile</Text>
-        </TouchableOpacity>
-        
-        {/* Settings */}
-        <TouchableOpacity 
-          style={styles.menuItem}
-          onPress={() => navigateToNestedScreen('ProfileTab', 'Settings')}
-        >
-          <Ionicons name="settings-outline" size={22} color="#555" />
-          <Text style={styles.menuItemText}>Settings</Text>
-        </TouchableOpacity>
-        
-        {/* Help & Support */}
-        <TouchableOpacity 
-          style={styles.menuItem}
-          onPress={() => navigateToNestedScreen('ProfileTab', 'HelpCenter')}
-        >
-          <Ionicons name="help-circle-outline" size={22} color="#555" />
-          <Text style={styles.menuItemText}>Help & Support</Text>
-        </TouchableOpacity>
-      </ScrollView>
-      
-      <View style={styles.bottomSection}>
-        <TouchableOpacity 
-          style={[styles.menuItem, styles.logoutItem]}
-          onPress={() => {
-            logout();
-            navigation.closeDrawer();
-          }}
-        >
-          <Ionicons name="log-out-outline" size={22} color="#E53935" />
-          <Text style={[styles.menuItemText, styles.logoutText]}>Logout</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+        <View style={styles.bottomSection}>
+          <TouchableOpacity 
+            style={[styles.menuItem, styles.logoutItem]}
+            onPress={() => {
+              logout();
+              navigation.closeDrawer();
+            }}
+          >
+            <Ionicons name="log-out-outline" size={22} color="#E53935" />
+            <Text style={[styles.menuItemText, styles.logoutText]}>Logout</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 };
 
@@ -191,6 +237,8 @@ function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     </Stack.Navigator>
   );
 }
@@ -253,6 +301,57 @@ function SettingsStack({ navigation }) {
   );
 }
 
+// Payment stack navigator for customer
+function PaymentStack({ navigation }) {
+  return (
+    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
+      <Stack.Screen 
+        name="PaymentMethods" 
+        component={PaymentMethodsScreen} 
+        options={{ title: 'Payment Methods' }} 
+      />
+      <Stack.Screen 
+        name="Payment" 
+        component={PaymentScreen} 
+        options={{ title: 'Make Payment' }} 
+      />
+      <Stack.Screen 
+        name="PaymentSuccess" 
+        component={PaymentSuccessScreen} 
+        options={{ title: 'Payment Complete', headerLeft: null }} 
+      />
+      <Stack.Screen 
+        name="TransactionHistory" 
+        component={TransactionHistoryScreen} 
+        options={{ title: 'Transaction History' }} 
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Earnings stack navigator for handyman
+function EarningsStack({ navigation }) {
+  return (
+    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
+      <Stack.Screen 
+        name="EarningsMain" 
+        component={EarningsScreen} 
+        options={{ title: 'Earnings' }} 
+      />
+      <Stack.Screen 
+        name="Withdrawal" 
+        component={WithdrawalScreen} 
+        options={{ title: 'Withdraw Funds' }} 
+      />
+      <Stack.Screen 
+        name="TransactionHistory" 
+        component={TransactionHistoryScreen} 
+        options={{ title: 'Transaction History' }} 
+      />
+    </Stack.Navigator>
+  );
+}
+
 // Profile stack navigator for both user types
 function ProfileStack({ navigation }) {
   return (
@@ -271,6 +370,16 @@ function ProfileStack({ navigation }) {
         name="Settings" 
         component={SettingsStack} 
         options={{ headerShown: false }} 
+      />
+      <Stack.Screen 
+        name="PaymentMethods" 
+        component={PaymentStack} 
+        options={{ headerShown: false }} 
+      />
+      <Stack.Screen 
+        name="TransactionHistory" 
+        component={TransactionHistoryScreen} 
+        options={{ title: 'Transaction History' }} 
       />
     </Stack.Navigator>
   );
@@ -293,7 +402,22 @@ function HomeStack({ navigation }) {
       <Stack.Screen 
         name="ProjectBid" 
         component={ProjectBidScreen} 
-        options={{ title: 'Create Project Bid' }} 
+        options={{ title: 'Create Project' }} 
+      />
+      <Stack.Screen 
+        name="Payment" 
+        component={PaymentScreen} 
+        options={{ title: 'Payment' }} 
+      />
+      <Stack.Screen 
+        name="PaymentSuccess" 
+        component={PaymentSuccessScreen} 
+        options={{ title: 'Payment Complete', headerLeft: null }} 
+      />
+      <Stack.Screen 
+        name="AdjustmentApproval" 
+        component={AdjustmentApprovalScreen} 
+        options={{ title: 'Budget Adjustment' }} 
       />
     </Stack.Navigator>
   );
@@ -312,6 +436,16 @@ function HandymanStack({ navigation }) {
         name="ProjectDetails" 
         component={ProjectDetailScreen} 
         options={{ title: 'Project Details' }} 
+      />
+      <Stack.Screen 
+        name="ProjectOffer" 
+        component={ProjectOfferScreen} 
+        options={{ title: 'Make an Offer' }} 
+      />
+      <Stack.Screen 
+        name="BudgetAdjustment" 
+        component={BudgetAdjustmentScreen} 
+        options={{ title: 'Adjust Budget' }} 
       />
     </Stack.Navigator>
   );
@@ -402,8 +536,12 @@ function HandymanTabs() {
 
           if (route.name === 'Dashboard') {
             iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'MyProjects') {
+            iconName = focused ? 'construct' : 'construct-outline';
           } else if (route.name === 'ChatTab') {
             iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+          } else if (route.name === 'EarningsTab') {
+            iconName = focused ? 'wallet' : 'wallet-outline';
           } else if (route.name === 'ProfileTab') {
             iconName = focused ? 'person' : 'person-outline';
           }
@@ -423,11 +561,42 @@ function HandymanTabs() {
         }} 
       />
       <Tab.Screen 
+        name="MyProjects" 
+        component={MyProjectsScreen} 
+        options={({ navigation }) => ({
+          title: 'My Projects',
+          headerStyle: {
+            backgroundColor: Colors.primary,
+          },
+          headerTintColor: Colors.white,
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+          headerLeft: () => (
+            <Ionicons
+              name="menu"
+              size={25}
+              color={Colors.white}
+              style={{ marginLeft: 15 }}
+              onPress={() => navigation.openDrawer()}
+            />
+          ),
+        })} 
+      />
+      <Tab.Screen 
         name="ChatTab" 
         component={ChatStack} 
         options={{ 
           headerShown: false,
           title: 'Messages'
+        }} 
+      />
+      <Tab.Screen 
+        name="EarningsTab" 
+        component={EarningsStack} 
+        options={{ 
+          headerShown: false,
+          title: 'Earnings'
         }} 
       />
       <Tab.Screen 
@@ -517,6 +686,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   drawerContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  safeAreaTop: {
+    backgroundColor: '#FFFFFF',
+    // On Android we need to ensure the drawer doesn't overlap the status bar
+    ...Platform.select({
+      android: {
+        height: StatusBar.currentHeight,
+      },
+    }),
+  },
+  safeAreaContent: {
     flex: 1,
     backgroundColor: '#FFFFFF',
   },

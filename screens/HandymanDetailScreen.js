@@ -7,8 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
   FlatList,
-  SafeAreaView,
-  Alert,
+  SafeAreaView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
@@ -40,13 +39,9 @@ const HandymanDetailScreen = ({ route, navigation }) => {
     { id: '2', service: 'Sink Installation', price: 120 },
     { id: '3', service: 'Toilet Repair', price: 80 },
     { id: '4', service: 'Pipe Replacement (per foot)', price: 15 },
-    { id: '5', service: 'Shower Installation', price: 250 },
-    { id: '6', service: 'Water Heater Repair', price: 100 },
-    { id: '7', service: 'Water Heater Installation', price: 350 },
-    { id: '8', service: 'Drain Cleaning', price: 75 },
   ];
   
-  // Mock reviews for demonstration
+  // Mock reviews
   const mockReviews = [
     {
       id: '1',
@@ -64,24 +59,19 @@ const HandymanDetailScreen = ({ route, navigation }) => {
       comment: 'Good work overall, but took a little longer than expected.',
       project: 'Installed ceiling fan',
     },
-    {
-      id: '3',
-      user: 'Michelle R.',
-      rating: 5,
-      date: '2025-04-05',
-      comment: 'Fantastic work! Will definitely hire again for future projects.',
-      project: 'Repaired bathroom tiles',
-    },
   ];
 
-  // Function to handle bidding on a project
-  const handleBidProject = () => {
+  // Function to handle creating a project
+  const handleCreateProject = () => {
     navigation.navigate('ProjectBid', { handyman });
   };
 
   // Function to message the handyman
   const handleMessageHandyman = () => {
-    navigation.navigate('Chat', { recipient: handyman });
+    navigation.navigate('ChatTab', { 
+      screen: 'Chat', 
+      params: { recipient: handyman }
+    });
   };
 
   // Render rating stars
@@ -112,15 +102,12 @@ const HandymanDetailScreen = ({ route, navigation }) => {
   const renderReviewItem = ({ item }) => (
     <View style={styles.reviewItem}>
       <View style={styles.reviewHeader}>
-        <View style={styles.reviewUser}>
-          <Text style={styles.reviewUserName}>{item.user}</Text>
-          <View style={styles.reviewRating}>
-            {renderRatingStars(item.rating)}
-          </View>
-        </View>
+        <Text style={styles.reviewUserName}>{item.user}</Text>
         <Text style={styles.reviewDate}>{item.date}</Text>
       </View>
-      <Text style={styles.reviewProject}>Project: {item.project}</Text>
+      <View style={styles.reviewRating}>
+        {renderRatingStars(item.rating)}
+      </View>
       <Text style={styles.reviewComment}>{item.comment}</Text>
     </View>
   );
@@ -140,8 +127,11 @@ const HandymanDetailScreen = ({ route, navigation }) => {
             <View style={styles.ratingContainer}>
               {renderRatingStars(handyman.rating)}
               <Text style={styles.reviewCount}>
-                ({handyman.reviews || handyman.totalReviews || 0} reviews)
+                {handyman.rating} ({handyman.reviews || handyman.totalReviews || 0})
               </Text>
+            </View>
+            <View style={styles.rateContainer}>
+              <Text style={styles.rateValue}>RM {handyman.hourlyRate}/hr</Text>
             </View>
           </View>
         </View>
@@ -149,26 +139,32 @@ const HandymanDetailScreen = ({ route, navigation }) => {
         {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity 
+            style={styles.bidButton}
+            onPress={handleCreateProject}
+          >
+            <Ionicons name="hammer-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.buttonText}>Hire Now</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
             style={styles.messageButton}
             onPress={handleMessageHandyman}
           >
             <Ionicons name="chatbubble-outline" size={20} color="#FFFFFF" />
             <Text style={styles.buttonText}>Message</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.bidButton}
-            onPress={handleBidProject}
-          >
-            <Ionicons name="hammer-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.buttonText}>Create Project Bid</Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Hourly Rate Banner */}
-        <View style={styles.rateContainer}>
-          <Text style={styles.rateLabel}>Hourly Rate</Text>
-          <Text style={styles.rateValue}>RM {handyman.hourlyRate}/hr</Text>
+        {/* Services/Categories Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Services</Text>
+          <View style={styles.categoriesContainer}>
+            {(handyman.categories || handyman.skills || []).map((category, index) => (
+              <View key={index} style={styles.categoryTag}>
+                <Text style={styles.categoryText}>{category}</Text>
+              </View>
+            ))}
+          </View>
         </View>
         
         {/* About Section */}
@@ -186,15 +182,25 @@ const HandymanDetailScreen = ({ route, navigation }) => {
           )}
         </View>
 
-        {/* Services/Categories Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Services</Text>
-          <View style={styles.categoriesContainer}>
-            {(handyman.categories || handyman.skills || []).map((category, index) => (
-              <View key={index} style={styles.categoryTag}>
-                <Text style={styles.categoryText}>{category}</Text>
-              </View>
-            ))}
+        {/* Stats Section */}
+        <View style={styles.statsSection}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{handyman.yearsExperience || '5'}+</Text>
+            <Text style={styles.statLabel}>Years Experience</Text>
+          </View>
+          
+          <View style={styles.statDivider} />
+          
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{handyman.completedJobs || handyman.completedProjects || 85}</Text>
+            <Text style={styles.statLabel}>Projects Done</Text>
+          </View>
+          
+          <View style={styles.statDivider} />
+          
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>95%</Text>
+            <Text style={styles.statLabel}>On-time</Text>
           </View>
         </View>
 
@@ -217,43 +223,6 @@ const HandymanDetailScreen = ({ route, navigation }) => {
               </View>
             ))}
           </View>
-          
-          <View style={styles.priceNotesContainer}>
-            <Ionicons name="information-circle-outline" size={16} color="#999999" />
-            <Text style={styles.priceNotes}>
-              Prices may vary based on job complexity and materials needed. Final quotation will be provided after assessment.
-            </Text>
-          </View>
-        </View>
-
-        {/* Stats Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Experience & Stats</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <View style={styles.statIconContainer}>
-                <Ionicons name="briefcase-outline" size={22} color={Colors.primary} />
-              </View>
-              <Text style={styles.statValue}>{handyman.yearsExperience || '5'}+ years</Text>
-              <Text style={styles.statLabel}>Experience</Text>
-            </View>
-            
-            <View style={styles.statItem}>
-              <View style={styles.statIconContainer}>
-                <Ionicons name="checkmark-circle-outline" size={22} color={Colors.primary} />
-              </View>
-              <Text style={styles.statValue}>{handyman.completedJobs || handyman.completedProjects || 85}</Text>
-              <Text style={styles.statLabel}>Projects Done</Text>
-            </View>
-            
-            <View style={styles.statItem}>
-              <View style={styles.statIconContainer}>
-                <Ionicons name="time-outline" size={22} color={Colors.primary} />
-              </View>
-              <Text style={styles.statValue}>95%</Text>
-              <Text style={styles.statLabel}>On-time</Text>
-            </View>
-          </View>
         </View>
 
         {/* Reviews Section */}
@@ -268,7 +237,7 @@ const HandymanDetailScreen = ({ route, navigation }) => {
           {/* Reviews List */}
           {mockReviews.length > 0 ? (
             <FlatList
-              data={mockReviews.slice(0, 3)}
+              data={mockReviews.slice(0, 2)}
               renderItem={renderReviewItem}
               keyExtractor={(item) => item.id}
               scrollEnabled={false}
@@ -282,16 +251,6 @@ const HandymanDetailScreen = ({ route, navigation }) => {
         
         {/* Bottom padding */}
         <View style={{ height: 20 }} />
-        
-        {/* Fixed Bid Button at bottom */}
-        <View style={styles.fixedBottomContainer}>
-          <TouchableOpacity
-            style={styles.fixedBidButton}
-            onPress={handleBidProject}
-          >
-            <Text style={styles.fixedBidButtonText}>Hire {handyman.name.split(' ')[0]}</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -300,7 +259,7 @@ const HandymanDetailScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F6F8FA',
+    backgroundColor: '#F8F8F8',
   },
   container: {
     flex: 1,
@@ -309,11 +268,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 20,
     backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     borderWidth: 2,
     borderColor: '#E8E8E8',
   },
@@ -336,32 +297,46 @@ const styles = StyleSheet.create({
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
   },
   reviewCount: {
     fontSize: 14,
     color: '#666666',
     marginLeft: 5,
   },
+  rateContainer: {
+    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  rateValue: {
+    color: Colors.primary,
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
   actionButtonsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
-    paddingBottom: 15,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 10,
   },
-  messageButton: {
-    flex: 1,
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
+  bidButton: {
+    flex: 2,
+    backgroundColor: Colors.primary || '#3498db',
+    paddingVertical: 14,
     borderRadius: 8,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
-  bidButton: {
-    flex: 2,
-    backgroundColor: Colors.primary || '#3498db',
-    paddingVertical: 12,
+  messageButton: {
+    flex: 1,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 14,
     borderRadius: 8,
     flexDirection: 'row',
     justifyContent: 'center',
@@ -372,23 +347,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 8,
   },
-  rateContainer: {
-    backgroundColor: Colors.primary || '#3498db',
-    padding: 15,
-    alignItems: 'center',
-  },
-  rateLabel: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 14,
-  },
-  rateValue: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
   section: {
     backgroundColor: '#FFFFFF',
-    marginTop: 10,
+    marginBottom: 10,
     padding: 20,
   },
   sectionTitle: {
@@ -425,8 +386,8 @@ const styles = StyleSheet.create({
   categoryTag: {
     backgroundColor: '#EBF5FF',
     borderRadius: 15,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     marginRight: 10,
     marginBottom: 10,
   },
@@ -434,77 +395,67 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.primary || '#3498db',
   },
-  statsContainer: {
+  statsSection: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 20,
+    marginBottom: 10,
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
   },
   statItem: {
-    flex: 1,
     alignItems: 'center',
-    padding: 10,
   },
-  statIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#F0F7FC',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#EEEEEE',
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#333333',
+    color: Colors.primary,
+    marginBottom: 5,
   },
   statLabel: {
     fontSize: 13,
     color: '#666666',
-    marginTop: 2,
   },
   reviewsContainer: {
     paddingBottom: 10,
   },
   reviewItem: {
     padding: 15,
+    backgroundColor: '#F9F9F9',
+    borderRadius: 8,
+    marginBottom: 10,
   },
   reviewSeparator: {
-    height: 1,
-    backgroundColor: '#EEEEEE',
-    marginVertical: 5,
+    height: 10,
   },
   reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 5,
   },
-  reviewUser: {
-    flex: 1,
-  },
   reviewUserName: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333333',
-    marginBottom: 4,
   },
   reviewRating: {
     flexDirection: 'row',
-    marginBottom: 5,
+    marginVertical: 5,
   },
   reviewDate: {
     fontSize: 12,
     color: '#999999',
   },
-  reviewProject: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primary || '#3498db',
-    marginBottom: 5,
-  },
   reviewComment: {
     fontSize: 14,
     lineHeight: 20,
     color: '#555555',
+    marginTop: 5,
   },
   noReviewsText: {
     fontSize: 14,
@@ -533,48 +484,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 'bold',
     color: '#333333',
-  },
-  priceNotesContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F8F8F8',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 10,
-    alignItems: 'flex-start',
-  },
-  priceNotes: {
-    fontSize: 13,
-    color: '#666666',
-    flex: 1,
-    marginLeft: 8,
-    lineHeight: 18,
-  },
-  fixedBottomContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#EEEEEE',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  fixedBidButton: {
-    backgroundColor: Colors.primary || '#3498db',
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  fixedBidButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 });
 

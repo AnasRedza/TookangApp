@@ -64,13 +64,12 @@ const MOCK_PROJECTS = [
 
 const MyProjectsScreen = ({ navigation }) => {
   const [projects, setProjects] = useState(MOCK_PROJECTS);
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('open');
 
   // Filter projects based on active tab
-  const filteredProjects = projects.filter(project => {
-    if (activeTab === 'all') return true;
-    return project.status.toLowerCase() === activeTab.toLowerCase();
-  });
+  const filteredProjects = projects.filter(project => 
+    project.status.toLowerCase() === activeTab.toLowerCase()
+  );
 
   const handleCancelProject = (projectId) => {
     Alert.alert(
@@ -171,7 +170,10 @@ const MyProjectsScreen = ({ navigation }) => {
             
             <TouchableOpacity 
               style={[styles.actionButton, { backgroundColor: '#2196F3' }]}
-              onPress={() => navigation.navigate('Chat', { recipient: item.handyman })}
+              onPress={() => navigation.navigate('ChatTab', {
+                screen: 'Chat',
+                params: { recipient: item.handyman }
+              })}
             >
               <Text style={styles.actionButtonText}>Message</Text>
             </TouchableOpacity>
@@ -196,7 +198,7 @@ const MyProjectsScreen = ({ navigation }) => {
       <Ionicons name="construct-outline" size={64} color="#CCC" />
       <Text style={styles.emptyTitle}>No Projects Found</Text>
       <Text style={styles.emptyText}>
-        You don't have any {activeTab !== 'all' ? activeTab.toLowerCase() : ''} projects yet
+        You don't have any {activeTab.toLowerCase()} projects yet
       </Text>
       <TouchableOpacity
         style={styles.findButton}
@@ -210,7 +212,7 @@ const MyProjectsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.tabsContainer}>
-        {['All', 'Open', 'Ongoing', 'Completed'].map((tab) => (
+        {['Open', 'Ongoing', 'Completed'].map((tab) => (
           <TouchableOpacity
             key={tab}
             style={[
