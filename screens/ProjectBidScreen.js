@@ -6,20 +6,17 @@ import {
   TextInput,
   ScrollView,
   TouchableOpacity,
-  Alert,
-  Switch,
   Image,
   Platform,
   KeyboardAvoidingView,
   Modal,
   FlatList,
-  SafeAreaView
+  Alert
 } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 
 const ProjectBidScreen = ({ route, navigation }) => {
-  // Get handyman data from route params
   const { handyman } = route.params || { 
     handyman: {
       id: '1',
@@ -33,25 +30,17 @@ const ProjectBidScreen = ({ route, navigation }) => {
     }
   };
   
-  // State variables
+  // Form state
   const [projectTitle, setProjectTitle] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const [budget, setBudget] = useState('');
-  const [isUrgent, setIsUrgent] = useState(false);
   const [startDate, setStartDate] = useState(new Date());
   const [attachments, setAttachments] = useState([]);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('hourly');
+  const [paymentType, setPaymentType] = useState('hourly');
   
-  // Modal visibility states
+  // Modal state
   const [datePickerVisible, setDatePickerVisible] = useState(false);
-  const [imageOptionsVisible, setImageOptionsVisible] = useState(false);
-  
-  // Payment options
-  const paymentOptions = [
-    { id: 'hourly', name: 'Hourly Rate', description: 'Pay based on the time spent' },
-    { id: 'fixed', name: 'Fixed Price', description: 'Pay a single agreed price' },
-    { id: 'quote', name: 'Request Quote', description: 'Ask for pricing first' }
-  ];
+  const [photoOptionsVisible, setPhotoOptionsVisible] = useState(false);
   
   // Format date for display
   const formatDate = (date) => {
@@ -59,434 +48,343 @@ const ProjectBidScreen = ({ route, navigation }) => {
     return date.toLocaleDateString('en-US', options);
   };
   
-  // Handle date selection from custom date picker
-  const handleDateSelection = (daysToAdd = 0) => {
+  // Handle date selection
+  const handleSelectDate = (daysToAdd) => {
     const newDate = new Date();
     newDate.setDate(newDate.getDate() + daysToAdd);
     setStartDate(newDate);
     setDatePickerVisible(false);
   };
   
-  // Mock function to add attachment (in a real app, this would use the device's camera/gallery)
-  const addAttachment = (source) => {
-    setImageOptionsVisible(false);
+  // Mock function to add a photo
+  const handleAddPhoto = (source) => {
+    setPhotoOptionsVisible(false);
     
-    // In a real app, this would use a library like react-native-image-picker
-    // For now, we'll just mock adding an image
-    const mockImageUrls = [
+    // Mock photo URLs for demo purposes
+    const mockPhotos = [
       'https://images.unsplash.com/photo-1581783898377-1c85bf937427',
       'https://images.unsplash.com/photo-1556911220-e15b29be8c8f',
       'https://images.unsplash.com/photo-1584622781564-1d987f7333c1',
-      'https://images.unsplash.com/photo-1584622650111-993a426fbf0a'
     ];
     
-    const newAttachment = {
+    const newPhoto = {
       id: Date.now().toString(),
-      uri: mockImageUrls[Math.floor(Math.random() * mockImageUrls.length)],
-      type: 'image',
-      name: `Photo ${attachments.length + 1}`
+      uri: mockPhotos[Math.floor(Math.random() * mockPhotos.length)]
     };
     
-    setAttachments([...attachments, newAttachment]);
-    
-    // Simulate successful image selection
-    setTimeout(() => {
-      Alert.alert(
-        "Photo Added",
-        source === 'camera' ? "Photo captured successfully" : "Photo selected from gallery"
-      );
-    }, 500);
-  };
-
-  // Remove attachment
-  const removeAttachment = (id) => {
-    setAttachments(attachments.filter(item => item.id !== id));
+    setAttachments([...attachments, newPhoto]);
   };
   
-  // Submit project bid
-  const handleSubmitBid = () => {
-    // Validate inputs
+  // Remove a photo
+  const handleRemovePhoto = (id) => {
+    setAttachments(attachments.filter(photo => photo.id !== id));
+  };
+  
+  // Submit the project bid
+  const handleSubmit = () => {
+    // Validate required fields
     if (!projectTitle.trim()) {
-      Alert.alert('Missing Information', 'Please enter a project title.');
+      Alert.alert('Please enter a project title');
       return;
     }
     
     if (!projectDescription.trim()) {
-      Alert.alert('Missing Information', 'Please describe your project.');
+      Alert.alert('Please enter a project description');
       return;
     }
     
-    if (selectedPaymentMethod !== 'quote' && !budget.trim()) {
-      Alert.alert('Missing Information', 'Please enter your budget.');
+    if (paymentType !== 'quote' && !budget.trim()) {
+      Alert.alert('Please enter your budget');
       return;
     }
     
-    // Format the bid data for submission
-    const bidData = {
-      projectTitle,
-      projectDescription,
-      budget: selectedPaymentMethod === 'quote' ? null : parseFloat(budget),
-      paymentMethod: selectedPaymentMethod,
+    // Create project data
+    const projectData = {
+      title: projectTitle,
+      description: projectDescription,
+      budget: paymentType === 'quote' ? 'Quote requested' : budget,
+      paymentType,
       startDate: startDate.toISOString(),
-      isUrgent,
       attachments,
       handymanId: handyman.id,
-      status: 'pending',
-      createdAt: new Date().toISOString()
+      status: 'pending'
     };
     
-    // In a real app, this would submit the bid to the API
-    console.log("Submitting bid:", bidData);
+    // Submit to API (mock)
+    console.log('Submitting project:', projectData);
     
+    // Show success message and navigate
     Alert.alert(
-      'Bid Submitted Successfully',
-      'Your project has been sent to the handyman. You can track its status in "My Projects".',
+      'Project Submitted',
+      'Your project has been sent to the handyman',
       [
         {
-          text: 'Go to My Projects',
+          text: 'View My Projects',
           onPress: () => navigation.navigate('MyProjects')
         },
         {
-          text: 'Stay Here',
-          style: 'cancel'
+          text: 'OK',
+          onPress: () => navigation.goBack()
         }
       ]
     );
   };
-  
-  // Render payment method option
-  const renderPaymentOption = (option) => (
+
+  // Render payment type option
+  const renderPaymentOption = (type, title, description) => (
     <TouchableOpacity
-      key={option.id}
       style={[
         styles.paymentOption,
-        selectedPaymentMethod === option.id && styles.selectedPaymentOption
+        paymentType === type && styles.paymentOptionSelected
       ]}
-      onPress={() => setSelectedPaymentMethod(option.id)}
+      onPress={() => setPaymentType(type)}
     >
+      <View style={styles.radioContainer}>
+        <View style={styles.radioOuter}>
+          {paymentType === type && <View style={styles.radioInner} />}
+        </View>
+      </View>
       <View style={styles.paymentOptionContent}>
-        <View style={styles.radioButton}>
-          {selectedPaymentMethod === option.id && (
-            <View style={styles.radioButtonSelected} />
-          )}
-        </View>
-        <View style={styles.paymentOptionInfo}>
-          <Text style={styles.paymentOptionTitle}>{option.name}</Text>
-          <Text style={styles.paymentOptionDescription}>{option.description}</Text>
-        </View>
+        <Text style={styles.paymentOptionTitle}>{title}</Text>
+        <Text style={styles.paymentOptionDescription}>{description}</Text>
       </View>
     </TouchableOpacity>
   );
-  
-  // Custom date picker modal
+
+  // Date picker modal
   const renderDatePickerModal = () => (
     <Modal
       visible={datePickerVisible}
-      transparent={true}
+      transparent
       animationType="slide"
       onRequestClose={() => setDatePickerVisible(false)}
     >
-      <TouchableOpacity
-        style={styles.modalOverlay}
+      <TouchableOpacity 
+        style={styles.modalOverlay} 
         activeOpacity={1}
         onPress={() => setDatePickerVisible(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Start Date</Text>
-              <TouchableOpacity 
-                onPress={() => setDatePickerVisible(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color={Colors.text} />
-              </TouchableOpacity>
-            </View>
-            
-            <TouchableOpacity
-              style={styles.dateOption}
-              onPress={() => handleDateSelection(0)}
-            >
-              <Text style={styles.dateOptionText}>Today</Text>
-              <Text style={styles.dateOptionDate}>{formatDate(new Date())}</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.dateOption}
-              onPress={() => handleDateSelection(1)}
-            >
-              <Text style={styles.dateOptionText}>Tomorrow</Text>
-              {(() => {
-                const tomorrow = new Date();
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                return <Text style={styles.dateOptionDate}>{formatDate(tomorrow)}</Text>;
-              })()}
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.dateOption}
-              onPress={() => handleDateSelection(2)}
-            >
-              <Text style={styles.dateOptionText}>In 2 days</Text>
-              {(() => {
-                const twoDays = new Date();
-                twoDays.setDate(twoDays.getDate() + 2);
-                return <Text style={styles.dateOptionDate}>{formatDate(twoDays)}</Text>;
-              })()}
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.dateOption}
-              onPress={() => handleDateSelection(7)}
-            >
-              <Text style={styles.dateOptionText}>Next week</Text>
-              {(() => {
-                const nextWeek = new Date();
-                nextWeek.setDate(nextWeek.getDate() + 7);
-                return <Text style={styles.dateOptionDate}>{formatDate(nextWeek)}</Text>;
-              })()}
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.dateOption}
-              onPress={() => handleDateSelection(14)}
-            >
-              <Text style={styles.dateOptionText}>In two weeks</Text>
-              {(() => {
-                const twoWeeks = new Date();
-                twoWeeks.setDate(twoWeeks.getDate() + 14);
-                return <Text style={styles.dateOptionDate}>{formatDate(twoWeeks)}</Text>;
-              })()}
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.dateOption}
-              onPress={() => handleDateSelection(30)}
-            >
-              <Text style={styles.dateOptionText}>In a month</Text>
-              {(() => {
-                const month = new Date();
-                month.setDate(month.getDate() + 30);
-                return <Text style={styles.dateOptionDate}>{formatDate(month)}</Text>;
-              })()}
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Start Date</Text>
+            <TouchableOpacity onPress={() => setDatePickerVisible(false)}>
+              <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
+          
+          <ScrollView>
+            <TouchableOpacity style={styles.dateOption} onPress={() => handleSelectDate(0)}>
+              <Text style={styles.dateOptionTitle}>Today</Text>
+              <Text style={styles.dateOptionSubtitle}>{formatDate(new Date())}</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.dateOption} onPress={() => handleSelectDate(1)}>
+              <Text style={styles.dateOptionTitle}>Tomorrow</Text>
+              <Text style={styles.dateOptionSubtitle}>{formatDate(new Date(Date.now() + 86400000))}</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.dateOption} onPress={() => handleSelectDate(7)}>
+              <Text style={styles.dateOptionTitle}>Next week</Text>
+              <Text style={styles.dateOptionSubtitle}>{formatDate(new Date(Date.now() + 86400000 * 7))}</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.dateOption} onPress={() => handleSelectDate(14)}>
+              <Text style={styles.dateOptionTitle}>In two weeks</Text>
+              <Text style={styles.dateOptionSubtitle}>{formatDate(new Date(Date.now() + 86400000 * 14))}</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.dateOption} onPress={() => handleSelectDate(30)}>
+              <Text style={styles.dateOptionTitle}>In a month</Text>
+              <Text style={styles.dateOptionSubtitle}>{formatDate(new Date(Date.now() + 86400000 * 30))}</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
       </TouchableOpacity>
     </Modal>
   );
-  
-  // Image options modal
-  const renderImageOptionsModal = () => (
+
+  // Photo options modal
+  const renderPhotoOptionsModal = () => (
     <Modal
-      visible={imageOptionsVisible}
-      transparent={true}
+      visible={photoOptionsVisible}
+      transparent
       animationType="slide"
-      onRequestClose={() => setImageOptionsVisible(false)}
+      onRequestClose={() => setPhotoOptionsVisible(false)}
     >
-      <TouchableOpacity
-        style={styles.modalOverlay}
+      <TouchableOpacity 
+        style={styles.modalOverlay} 
         activeOpacity={1}
-        onPress={() => setImageOptionsVisible(false)}
+        onPress={() => setPhotoOptionsVisible(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Photo</Text>
-              <TouchableOpacity 
-                onPress={() => setImageOptionsVisible(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color={Colors.text} />
-              </TouchableOpacity>
-            </View>
-            
-            <TouchableOpacity
-              style={styles.modalOption}
-              onPress={() => addAttachment('camera')}
-            >
-              <Ionicons name="camera-outline" size={24} color={Colors.primary} />
-              <Text style={styles.modalOptionText}>Take Photo</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.modalOption}
-              onPress={() => addAttachment('gallery')}
-            >
-              <Ionicons name="images-outline" size={24} color={Colors.primary} />
-              <Text style={styles.modalOptionText}>Choose from Gallery</Text>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Add Photo</Text>
+            <TouchableOpacity onPress={() => setPhotoOptionsVisible(false)}>
+              <Ionicons name="close" size={24} color="#333" />
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
+          
+          <TouchableOpacity style={styles.modalOption} onPress={() => handleAddPhoto('camera')}>
+            <Ionicons name="camera-outline" size={24} color={Colors.primary} />
+            <Text style={styles.modalOptionText}>Take Photo</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.modalOption} onPress={() => handleAddPhoto('gallery')}>
+            <Ionicons name="images-outline" size={24} color={Colors.primary} />
+            <Text style={styles.modalOptionText}>Choose from Gallery</Text>
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
     </Modal>
   );
-  
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Handyman Info */}
-        <View style={styles.handymanInfo}>
-          <Image 
-            source={{ uri: handyman.profilePicture }} 
-            style={styles.handymanImage} 
-          />
-          <View style={styles.handymanDetails}>
+      <ScrollView>
+        {/* Handyman info */}
+        <View style={styles.handymanCard}>
+          <Image source={{ uri: handyman.profilePicture }} style={styles.handymanImage} />
+          <View style={styles.handymanInfo}>
             <Text style={styles.handymanName}>{handyman.name}</Text>
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={14} color="#FFD700" />
-              <Text style={styles.ratingText}>{handyman.rating} ({handyman.totalReviews} reviews)</Text>
+            <View style={styles.handymanRating}>
+              <Ionicons name="star" size={16} color="#FFD700" />
+              <Text style={styles.ratingText}>{handyman.rating}</Text>
             </View>
-          </View>
-          <View style={styles.handymanRateContainer}>
-            <Text style={styles.rateLabel}>Rate</Text>
-            <Text style={styles.rate}>${handyman.hourlyRate}/hr</Text>
+            <Text style={styles.rateText}>RM{handyman.hourlyRate}/hr</Text>
           </View>
         </View>
-        
-        {/* Project Information Form */}
+
+        {/* Project details */}
         <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Project Information</Text>
+          <Text style={styles.sectionTitle}>Project Details</Text>
           
-          <Text style={styles.label}>Project Title <Text style={styles.required}>*</Text></Text>
-          <View style={styles.inputContainer}>
-            <TextInput
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Project Title <Text style={styles.required}>*</Text></Text>
+            <TextInput 
               style={styles.input}
               value={projectTitle}
               onChangeText={setProjectTitle}
-              placeholder="E.g., Bathroom sink repair"
-              placeholderTextColor="#A0A0A0"
+              placeholder="What needs to be done?"
+              placeholderTextColor="#999"
             />
           </View>
           
-          <Text style={styles.label}>Project Description <Text style={styles.required}>*</Text></Text>
-          <View style={[styles.inputContainer, styles.textAreaContainer]}>
-            <TextInput
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Description <Text style={styles.required}>*</Text></Text>
+            <TextInput 
               style={[styles.input, styles.textArea]}
               value={projectDescription}
               onChangeText={setProjectDescription}
-              placeholder="Describe your project in detail. Include information about the task, location, and any specific requirements."
-              placeholderTextColor="#A0A0A0"
+              placeholder="Describe what you need help with..."
+              placeholderTextColor="#999"
               multiline
-              numberOfLines={6}
+              numberOfLines={4}
               textAlignVertical="top"
             />
           </View>
           
-          {/* Payment Method Selection */}
-          <Text style={styles.label}>Payment Method <Text style={styles.required}>*</Text></Text>
-          <View style={styles.paymentOptionsContainer}>
-            {paymentOptions.map(renderPaymentOption)}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Start Date</Text>
+            <TouchableOpacity 
+              style={styles.dateButton}
+              onPress={() => setDatePickerVisible(true)}
+            >
+              <Text style={styles.dateButtonText}>{formatDate(startDate)}</Text>
+              <Ionicons name="calendar-outline" size={20} color="#666" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Payment options */}
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>Payment</Text>
+          
+          <View style={styles.paymentOptions}>
+            {renderPaymentOption('hourly', 'Hourly Rate', 'Pay based on time spent')}
+            {renderPaymentOption('fixed', 'Fixed Price', 'Pay a single agreed price')}
+            {renderPaymentOption('quote', 'Request Quote', 'Ask for pricing first')}
           </View>
           
-          {/* Budget Input (conditional) */}
-          {selectedPaymentMethod !== 'quote' && (
-            <>
+          {paymentType !== 'quote' && (
+            <View style={styles.inputGroup}>
               <Text style={styles.label}>
-                {selectedPaymentMethod === 'hourly' ? 'Budget per Hour (USD)' : 'Total Budget (USD)'} 
+                {paymentType === 'hourly' ? 'Budget per Hour (RM)' : 'Total Budget (RM)'}
                 <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.budgetInputContainer}>
-                <Text style={styles.currencySymbol}>$</Text>
-                <TextInput
+                <Text style={styles.currencySymbol}>RM</Text>
+                <TextInput 
                   style={styles.budgetInput}
                   value={budget}
-                  onChangeText={text => setBudget(text.replace(/[^0-9.]/g, ''))}
-                  placeholder="Enter amount"
-                  placeholderTextColor="#A0A0A0"
+                  onChangeText={(text) => setBudget(text.replace(/[^0-9.]/g, ''))}
+                  placeholder="0.00"
+                  placeholderTextColor="#999"
                   keyboardType="decimal-pad"
                 />
               </View>
-            </>
-          )}
-          
-          <Text style={styles.label}>Preferred Start Date</Text>
-          <TouchableOpacity 
-            style={styles.datePickerButton}
-            onPress={() => setDatePickerVisible(true)}
-          >
-            <Text style={styles.dateText}>{formatDate(startDate)}</Text>
-            <Ionicons name="calendar-outline" size={20} color={Colors.primary} />
-          </TouchableOpacity>
-          
-          <View style={styles.switchRow}>
-            <View>
-              <Text style={styles.label}>Mark as Urgent</Text>
-              <Text style={styles.switchSubtext}>Prioritize your project in the handyman's queue</Text>
             </View>
-            <Switch
-              value={isUrgent}
-              onValueChange={setIsUrgent}
-              trackColor={{ false: '#D1D1D1', true: Colors.primary }}
-              thumbColor="#FFF"
-              ios_backgroundColor="#D1D1D1"
-            />
-          </View>
+          )}
         </View>
-        
-        {/* Attachments Section */}
+
+        {/* Photos */}
         <View style={styles.formSection}>
-          <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionTitle}>Attachments</Text>
-            <Text style={styles.optionalText}>(Optional)</Text>
-          </View>
-          <Text style={styles.helperText}>Add photos to help explain your project</Text>
+          <Text style={styles.sectionTitle}>Photos</Text>
+          <Text style={styles.helpText}>Add photos to help explain your project</Text>
           
-          <TouchableOpacity 
-            style={styles.attachmentButton} 
-            onPress={() => setImageOptionsVisible(true)}
+          <TouchableOpacity
+            style={styles.addPhotoButton}
+            onPress={() => setPhotoOptionsVisible(true)}
           >
-            <Ionicons name="camera-outline" size={22} color={Colors.primary} />
-            <Text style={styles.attachmentButtonText}>Add Photos</Text>
+            <Ionicons name="camera-outline" size={24} color={Colors.primary} />
+            <Text style={styles.addPhotoText}>Add Photo</Text>
           </TouchableOpacity>
           
           {attachments.length > 0 && (
-            <View style={styles.attachmentList}>
-              <FlatList
-                data={attachments}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <View style={styles.attachmentItem}>
-                    <Image source={{ uri: item.uri }} style={styles.attachmentImage} />
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => removeAttachment(item.id)}
-                    >
-                      <Ionicons name="close-circle" size={22} color={Colors.primary} />
-                    </TouchableOpacity>
-                  </View>
-                )}
-                contentContainerStyle={styles.attachmentListContent}
-              />
-            </View>
+            <FlatList
+              data={attachments}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.photoContainer}>
+                  <Image source={{ uri: item.uri }} style={styles.photo} />
+                  <TouchableOpacity
+                    style={styles.removePhotoButton}
+                    onPress={() => handleRemovePhoto(item.id)}
+                  >
+                    <Ionicons name="close-circle" size={22} color={Colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              )}
+              style={styles.photosList}
+            />
           )}
         </View>
-        
-        {/* Privacy notice */}
-        <View style={styles.privacyNotice}>
-          <Ionicons name="shield-checkmark-outline" size={18} color={Colors.darkGray} />
+
+        {/* Privacy note */}
+        <View style={styles.privacyNote}>
+          <Ionicons name="shield-checkmark-outline" size={18} color="#777" />
           <Text style={styles.privacyText}>
-            Your contact information will only be shared with the handyman after you accept their quote.
+            Your contact details will only be shared with the handyman after you accept their quote.
           </Text>
         </View>
-        
+
         {/* Submit button */}
-        <TouchableOpacity
+        <TouchableOpacity 
           style={styles.submitButton}
-          onPress={handleSubmitBid}
+          onPress={handleSubmit}
         >
           <Text style={styles.submitButtonText}>Submit Project</Text>
         </TouchableOpacity>
       </ScrollView>
       
-      {/* Render Modals */}
+      {/* Modals */}
       {renderDatePickerModal()}
-      {renderImageOptionsModal()}
+      {renderPhotoOptionsModal()}
     </KeyboardAvoidingView>
   );
 };
@@ -494,350 +392,285 @@ const ProjectBidScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F8F8F8',
   },
-  scrollContent: {
-    paddingBottom: 30,
-  },
-  handymanInfo: {
+  handymanCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
-    backgroundColor: Colors.white,
+    backgroundColor: '#FFF',
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
+    borderBottomColor: '#EEE',
   },
   handymanImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     marginRight: 12,
   },
-  handymanDetails: {
+  handymanInfo: {
     flex: 1,
   },
   handymanName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: '#333',
+    marginBottom: 2,
   },
-  ratingRow: {
+  handymanRating: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginBottom: 2,
   },
   ratingText: {
-    fontSize: 12,
-    color: Colors.darkGray,
+    fontSize: 14,
+    color: '#666',
     marginLeft: 4,
   },
-  handymanRateContainer: {
-    alignItems: 'center',
-  },
-  rateLabel: {
-    fontSize: 12,
-    color: Colors.darkGray,
-  },
-  rate: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  rateText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: Colors.primary,
   },
   formSection: {
-    marginTop: 15,
-    backgroundColor: Colors.white,
-    paddingHorizontal: 15,
-    paddingVertical: 20,
+    backgroundColor: '#FFF',
+    padding: 16,
+    marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 15,
+    color: '#333',
+    marginBottom: 16,
   },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  optionalText: {
-    fontSize: 14,
-    color: Colors.darkGray,
-    marginLeft: 5,
+  inputGroup: {
+    marginBottom: 16,
   },
   label: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '500',
-    color: Colors.text,
+    color: '#555',
     marginBottom: 8,
   },
   required: {
-    color: 'red',
-  },
-  inputContainer: {
-    backgroundColor: '#F9F9F9',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#EEEEEE',
-    marginBottom: 15,
+    color: '#E53935',
+    fontWeight: 'bold',
   },
   input: {
+    borderWidth: 1,
+    borderColor: '#DDD',
+    borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    fontSize: 15,
-    color: Colors.text,
-  },
-  textAreaContainer: {
-    minHeight: 120,
+    fontSize: 16,
+    color: '#333',
+    backgroundColor: '#FAFAFA',
   },
   textArea: {
-    height: 120,
+    minHeight: 100,
+    paddingTop: 12,
   },
-  paymentOptionsContainer: {
-    marginBottom: 15,
+  dateButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#DDD',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#FAFAFA',
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  paymentOptions: {
+    marginBottom: 16,
   },
   paymentOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#EEEEEE',
+    borderColor: '#DDD',
     borderRadius: 8,
-    marginBottom: 10,
     padding: 12,
+    marginBottom: 10,
   },
-  selectedPaymentOption: {
+  paymentOptionSelected: {
     borderColor: Colors.primary,
     backgroundColor: 'rgba(52, 152, 219, 0.05)',
   },
-  paymentOptionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  radioContainer: {
+    marginRight: 12,
   },
-  radioButton: {
+  radioOuter: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
     borderColor: Colors.primary,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    justifyContent: 'center',
   },
-  radioButtonSelected: {
+  radioInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
     backgroundColor: Colors.primary,
   },
-  paymentOptionInfo: {
+  paymentOptionContent: {
     flex: 1,
   },
   paymentOptionTitle: {
     fontSize: 15,
-    fontWeight: '500',
-    color: Colors.text,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
   },
   paymentOptionDescription: {
     fontSize: 13,
-    color: Colors.darkGray,
-    marginTop: 2,
+    color: '#777',
   },
   budgetInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9F9F9',
-    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#EEEEEE',
-    marginBottom: 15,
+    borderColor: '#DDD',
+    borderRadius: 8,
+    backgroundColor: '#FAFAFA',
   },
   currencySymbol: {
+    paddingLeft: 12,
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.darkGray,
-    paddingLeft: 12,
+    color: '#777',
   },
   budgetInput: {
     flex: 1,
     paddingHorizontal: 8,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: Colors.text,
-  },
-  datePickerButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#F9F9F9',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#EEEEEE',
-    paddingHorizontal: 12,
     paddingVertical: 12,
-    marginBottom: 15,
+    fontSize: 16,
+    color: '#333',
   },
-  dateText: {
-    fontSize: 15,
-    color: Colors.text,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 5,
-  },
-  switchSubtext: {
-    fontSize: 12,
-    color: Colors.darkGray,
-    marginTop: 2,
-  },
-  helperText: {
+  helpText: {
     fontSize: 14,
-    color: Colors.darkGray,
-    marginBottom: 15,
+    color: '#777',
+    marginBottom: 16,
   },
-  attachmentButton: {
+  addPhotoButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F0F7FC',
-    paddingVertical: 12,
-    borderRadius: 8,
     borderWidth: 1,
-    borderStyle: 'dashed',
     borderColor: Colors.primary,
-    marginBottom: 15,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(52, 152, 219, 0.05)',
   },
-  attachmentButtonText: {
+  addPhotoText: {
+    fontSize: 16,
     color: Colors.primary,
-    fontWeight: '500',
     marginLeft: 8,
   },
-  attachmentList: {
-    marginBottom: 10,
+  photosList: {
+    marginTop: 16,
   },
-  attachmentListContent: {
-    paddingVertical: 5,
-  },
-  attachmentItem: {
-    marginRight: 12,
+  photoContainer: {
+    marginRight: 10,
     position: 'relative',
   },
-  attachmentImage: {
+  photo: {
     width: 80,
     height: 80,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#EEEEEE',
   },
-  removeButton: {
+  removePhotoButton: {
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: Colors.white,
+    backgroundColor: '#FFF',
     borderRadius: 12,
   },
-  privacyNotice: {
+  privacyNote: {
     flexDirection: 'row',
-    padding: 15,
-    backgroundColor: '#F0F7FC',
-    marginTop: 15,
-    marginHorizontal: 15,
+    backgroundColor: 'rgba(52, 152, 219, 0.08)',
+    padding: 12,
     borderRadius: 8,
+    marginHorizontal: 16,
+    marginVertical: 16,
   },
   privacyText: {
     flex: 1,
-    fontSize: 13,
-    color: Colors.darkGray,
-    marginLeft: 8,
+    fontSize: 14,
+    color: '#555',
+    marginLeft: 10,
   },
   submitButton: {
     backgroundColor: Colors.primary,
     borderRadius: 8,
-    paddingVertical: 15,
-    marginTop: 20,
-    marginHorizontal: 15,
+    padding: 16,
+    margin: 16,
     alignItems: 'center',
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    marginBottom: 30,
   },
   submitButtonText: {
-    color: Colors.white,
+    color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: 'transparent',
-  },
-  modalContent: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: Platform.OS === 'ios' ? 35 : 20,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
+    borderBottomColor: '#EEE',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
-  },
-  closeButton: {
-    padding: 5,
+    color: '#333',
   },
   modalOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#EEE',
   },
   modalOptionText: {
     fontSize: 16,
-    color: Colors.text,
-    marginLeft: 15,
+    color: '#333',
+    marginLeft: 16,
   },
   dateOption: {
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#EEE',
   },
-  dateOptionText: {
+  dateOptionTitle: {
     fontSize: 16,
-    color: Colors.text,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
   },
-  dateOptionDate: {
+  dateOptionSubtitle: {
     fontSize: 14,
-    color: Colors.darkGray,
-    marginTop: 4,
+    color: '#777',
   },
 });
-
-// Default colors (assuming these exist in your Colors constant)
-if (!Colors) {
-  const Colors = {
-    primary: '#3498db',
-    text: '#333333',
-    darkGray: '#777777',
-    white: '#FFFFFF',
-    black: '#000000'
-  };
-}
 
 export default ProjectBidScreen;

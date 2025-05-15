@@ -3,200 +3,215 @@ import {
   View,
   Text,
   TextInput,
+  TouchableOpacity,
   FlatList,
   StyleSheet,
-  TouchableOpacity,
+  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   Image,
   ActivityIndicator,
+  Keyboard
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
 import Colors from '../constants/Colors';
 
-// Mock data for conversations
+// Mock data for messages
 const MOCK_MESSAGES = [
   {
     id: '1',
-    text: 'Hello, I am interested in your plumbing services. I have a leaking sink that needs fixing.',
-    sender: 'customer',
-    timestamp: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    sender: 'recipient',
+    text: "Hello! I'm interested in repairing my kitchen sink. Are you available this week?",
+    timestamp: new Date(Date.now() - 3600000 * 24).toISOString(), // 1 day ago
   },
   {
     id: '2',
-    text: 'Hi there! I would be happy to help you with your leaking sink. When would you like me to come and take a look?',
-    sender: 'handyman',
-    timestamp: new Date(Date.now() - 82800000).toISOString(), // 23 hours ago
+    sender: 'user',
+    text: "Hi there! Yes, I can help with your kitchen sink. What's the issue you're experiencing?",
+    timestamp: new Date(Date.now() - 3000000).toISOString(), // A bit later
   },
   {
     id: '3',
-    text: 'Would tomorrow at 10am work for you?',
-    sender: 'customer',
-    timestamp: new Date(Date.now() - 79200000).toISOString(), // 22 hours ago
+    sender: 'recipient',
+    text: 'The sink is draining very slowly and there\'s a small leak under the cabinet. I think the P-trap might need to be replaced.',
+    timestamp: new Date(Date.now() - 2400000).toISOString(), 
   },
   {
     id: '4',
-    text: 'Yes, that works for me. Please send me your address and I will be there at 10am.',
-    sender: 'handyman',
-    timestamp: new Date(Date.now() - 75600000).toISOString(), // 21 hours ago
+    sender: 'user',
+    text: 'That sounds like it could be a clogged drain and worn-out seal. I can check it out and fix it. When would you like me to come over?',
+    timestamp: new Date(Date.now() - 1800000).toISOString(),
   },
   {
     id: '5',
-    text: 'My address is 123 Main Street, Apartment 4B. There is parking available on the street.',
-    sender: 'customer',
-    timestamp: new Date(Date.now() - 72000000).toISOString(), // 20 hours ago
+    sender: 'recipient',
+    text: 'Would tomorrow at 10am work for you?',
+    timestamp: new Date(Date.now() - 1200000).toISOString(),
   },
   {
     id: '6',
-    text: 'Great! I have your address noted. Do you know what type of sink it is? Is it a kitchen or bathroom sink?',
-    sender: 'handyman',
-    timestamp: new Date(Date.now() - 68400000).toISOString(), // 19 hours ago
+    sender: 'user',
+    text: 'That works for me. My rate is RM45/hour and I estimate it will take 1-2 hours depending on the condition of the pipes.',
+    timestamp: new Date(Date.now() - 600000).toISOString(),
   },
   {
     id: '7',
-    text: 'It is a bathroom sink. The leak is coming from the pipe under the sink.',
-    sender: 'customer',
-    timestamp: new Date(Date.now() - 64800000).toISOString(), // 18 hours ago
-  },
-  {
-    id: '8',
-    text: 'Okay, I understand. I will bring the necessary tools and parts to fix a bathroom sink pipe. See you tomorrow at 10am!',
-    sender: 'handyman',
-    timestamp: new Date(Date.now() - 61200000).toISOString(), // 17 hours ago
-  },
+    sender: 'recipient',
+    text: 'That sounds good. Can you provide a total price estimate including any parts?',
+    timestamp: new Date(Date.now() - 300000).toISOString(),
+  }
 ];
 
 const ChatScreen = ({ route, navigation }) => {
-  const { userType } = useAuth();
+  const { recipient } = route.params;
   const [messages, setMessages] = useState(MOCK_MESSAGES);
-  const [inputText, setInputText] = useState('');
+  const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
   const flatListRef = useRef(null);
 
-  // Get chat recipient from route params
-  const { recipient } = route.params || {
-    recipient: {
-      id: 'default',
-      name: userType === 'customer' ? 'John the Plumber' : 'Sarah Customer',
-      avatar: userType === 'customer' 
-        ? 'https://randomuser.me/api/portraits/men/1.jpg' 
-        : 'https://randomuser.me/api/portraits/women/2.jpg',
-      lastSeen: 'Online now',
-    }
-  };
-
-  // Set navigation header with recipient info
   useEffect(() => {
+    // Set header title and options
     navigation.setOptions({
-      headerTitle: () => (
-        <View style={styles.headerTitle}>
-          <Image source={{ uri: recipient.avatar }} style={styles.headerAvatar} />
-          <View>
-            <Text style={styles.headerName}>{recipient.name}</Text>
-            <Text style={styles.headerStatus}>{recipient.lastSeen}</Text>
-          </View>
-        </View>
-      ),
-      headerRight: () => (
-        <TouchableOpacity style={styles.headerButton}>
-          <Ionicons name="call" size={22} color={Colors.white} />
+      title: recipient.name,
+      headerLeft: () => (
+        <TouchableOpacity
+          style={{ paddingLeft: 16 }}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
       ),
+      headerTitle: () => (
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerName}>{recipient.name}</Text>
+          <Text style={styles.headerProject}>{recipient.project}</Text>
+        </View>
+      ),
     });
+    
+    // Hide bottom tab navigator when keyboard is shown
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      if (navigation.getParent()) {
+        navigation.getParent().setOptions({
+          tabBarStyle: { display: 'none' }
+        });
+      }
+    });
+    
+    // Show bottom tab navigator when keyboard is hidden
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      if (navigation.getParent()) {
+        navigation.getParent().setOptions({
+          tabBarStyle: { display: 'flex' }
+        });
+      }
+    });
+    
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+      // Restore tab bar when leaving screen
+      if (navigation.getParent()) {
+        navigation.getParent().setOptions({
+          tabBarStyle: { display: 'flex' }
+        });
+      }
+    };
   }, [navigation, recipient]);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    if (flatListRef.current) {
-      flatListRef.current.scrollToEnd({ animated: true });
-    }
-  }, [messages]);
-
-  const formatTimestamp = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  const formatDate = (timestamp) => {
-    const date = new Date(timestamp);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString();
-    }
-  };
-
   const handleSend = () => {
-    if (inputText.trim() === '') return;
+    if (newMessage.trim() === '') return;
 
-    const newMessage = {
+    // Add new message to the list
+    const message = {
       id: Date.now().toString(),
-      text: inputText.trim(),
-      sender: userType === 'customer' ? 'customer' : 'handyman',
+      sender: 'user',
+      text: newMessage.trim(),
       timestamp: new Date().toISOString(),
     };
 
-    setMessages([...messages, newMessage]);
-    setInputText('');
+    setIsLoading(true);
+    
+    // Add message immediately but simulate network delay
+    setMessages(prevMessages => [...prevMessages, message]);
+    setNewMessage('');
 
-    // Simulate receiving a reply
-    if (messages.length % 3 === 0) {
-      setIsLoading(true);
-      setTimeout(() => {
-        const replyMessage = {
-          id: (Date.now() + 1).toString(),
-          text: userType === 'customer' 
-            ? 'Thanks for your message! I will get back to you soon.' 
-            : 'Got it! Let me know if you need anything else.',
-          sender: userType === 'customer' ? 'handyman' : 'customer',
-          timestamp: new Date().toISOString(),
-        };
-        setMessages(prev => [...prev, replyMessage]);
-        setIsLoading(false);
-      }, 2000);
-    }
+    // Scroll to bottom after message is sent
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd();
+      setIsLoading(false);
+    }, 300);
   };
 
-  const renderItem = ({ item, index }) => {
-    const isCurrentUser = 
-      (userType === 'customer' && item.sender === 'customer') || 
-      (userType === 'handyman' && item.sender === 'handyman');
+  // Format timestamp for display
+  const formatTimestamp = (timestamp) => {
+    const messageDate = new Date(timestamp);
+    return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const renderMessageItem = ({ item, index }) => {
+    const isUser = item.sender === 'user';
+    const showTimestamp = index === 0 || 
+      new Date(item.timestamp).getDate() !== new Date(messages[index - 1].timestamp).getDate();
     
-    // Show date separator if first message or if date changes from previous message
-    const showDateSeparator = index === 0 || 
-      formatDate(item.timestamp) !== formatDate(messages[index - 1].timestamp);
+    // Group consecutive messages from the same sender
+    const showAvatar = !isUser && (
+      index === 0 || 
+      messages[index - 1].sender !== 'recipient'
+    );
+    
+    // Add extra styling for grouped messages
+    const isFirstInGroup = index === 0 || messages[index - 1].sender !== item.sender;
+    const isLastInGroup = index === messages.length - 1 || messages[index + 1].sender !== item.sender;
+    
+    const bubbleStyle = {
+      ...(isUser ? styles.userMessageBubble : styles.recipientMessageBubble),
+      ...(isFirstInGroup && { 
+        borderTopLeftRadius: isUser ? 18 : (showAvatar ? 18 : 4),
+        borderTopRightRadius: isUser ? (isFirstInGroup ? 18 : 4) : 18,
+      }),
+      ...(isLastInGroup && { 
+        borderBottomLeftRadius: isUser ? 18 : (showAvatar ? 18 : 4),
+        borderBottomRightRadius: isUser ? (isLastInGroup ? 18 : 4) : 18, 
+      }),
+      ...((!isFirstInGroup || !isLastInGroup) && {
+        marginVertical: 2,
+      })
+    };
     
     return (
-      <>
-        {showDateSeparator && (
-          <View style={styles.dateSeparator}>
-            <Text style={styles.dateSeparatorText}>{formatDate(item.timestamp)}</Text>
+      <View>
+        {showTimestamp && (
+          <View style={styles.dateContainer}>
+            <Text style={styles.dateText}>
+              {new Date(item.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+            </Text>
           </View>
         )}
         <View style={[
           styles.messageContainer,
-          isCurrentUser ? styles.currentUserMessage : styles.otherUserMessage
+          isUser ? styles.userMessageContainer : styles.recipientMessageContainer,
+          !isFirstInGroup && { marginTop: 1 },
+          !isLastInGroup && { marginBottom: 1 }
         ]}>
+          {showAvatar ? (
+            <Image source={{ uri: recipient.avatar }} style={styles.avatar} />
+          ) : !isUser ? (
+            <View style={styles.avatarPlaceholder} />
+          ) : null}
           <View style={[
             styles.messageBubble,
-            isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble
+            bubbleStyle
           ]}>
             <Text style={[
               styles.messageText,
-              isCurrentUser ? styles.currentUserText : styles.otherUserText
+              isUser ? styles.userMessageText : null
             ]}>{item.text}</Text>
+            <Text style={styles.timestampText}>{formatTimestamp(item.timestamp)}</Text>
           </View>
-          <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
         </View>
-      </>
+      </View>
     );
   };
 
@@ -204,45 +219,51 @@ const ChatScreen = ({ route, navigation }) => {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardAvoid}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        style={styles.keyboardAvoidContainer}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 100}
       >
         <FlatList
           ref={flatListRef}
           data={messages}
-          renderItem={renderItem}
+          renderItem={renderMessageItem}
           keyExtractor={item => item.id}
-          contentContainerStyle={styles.messagesList}
+          contentContainerStyle={styles.messagesContainer}
+          onLayout={() => flatListRef.current?.scrollToEnd()}
         />
         
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <View style={styles.loadingBubble}>
-              <ActivityIndicator size="small" color={Colors.primary} />
-            </View>
-          </View>
-        )}
-        
         <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.attachButton}>
-            <Ionicons name="attach" size={24} color={Colors.darkGray} />
-          </TouchableOpacity>
           <TextInput
             style={styles.input}
             placeholder="Type a message..."
-            value={inputText}
-            onChangeText={setInputText}
+            value={newMessage}
+            onChangeText={setNewMessage}
             multiline
+            onFocus={() => {
+              if (navigation.getParent()) {
+                navigation.getParent().setOptions({
+                  tabBarStyle: { display: 'none' }
+                });
+              }
+            }}
+            onBlur={() => {
+              if (navigation.getParent()) {
+                navigation.getParent().setOptions({
+                  tabBarStyle: { display: 'flex' }
+                });
+              }
+            }}
           />
-          {inputText.trim() ? (
-            <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-              <Ionicons name="send" size={24} color={Colors.white} />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.micButton}>
-              <Ionicons name="mic" size={24} color={Colors.darkGray} />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity 
+            style={styles.sendButton}
+            onPress={handleSend}
+            disabled={isLoading || newMessage.trim() === ''}
+          >
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Ionicons name="send" size={20} color="#FFFFFF" />
+            )}
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -252,123 +273,126 @@ const ChatScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FAFAFA', // Lighter background for a cleaner look
+    position: 'relative',
+    zIndex: 1,
   },
-  keyboardAvoid: {
+  keyboardAvoidContainer: {
     flex: 1,
+    width: '100%',
   },
-  headerTitle: {
-    flexDirection: 'row',
+  headerTitleContainer: {
     alignItems: 'center',
   },
-  headerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
-  },
   headerName: {
-    color: Colors.white,
-    fontWeight: 'bold',
     fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
   },
-  headerStatus: {
-    color: Colors.white,
+  headerProject: {
     fontSize: 12,
-    opacity: 0.8,
+    color: '#666',
   },
-  headerButton: {
-    marginRight: 10,
+  messagesContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 20,
   },
-  messagesList: {
-    paddingVertical: 20,
-    paddingHorizontal: 15,
+  dateContainer: {
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#999',
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
   messageContainer: {
-    marginVertical: 5,
+    flexDirection: 'row',
+    marginBottom: 8,
     maxWidth: '80%',
   },
-  currentUserMessage: {
+  userMessageContainer: {
     alignSelf: 'flex-end',
   },
-  otherUserMessage: {
+  recipientMessageContainer: {
     alignSelf: 'flex-start',
+  },
+  avatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 8,
+    alignSelf: 'flex-end',
+    marginBottom: 6,
+  },
+  avatarPlaceholder: {
+    width: 28,
+    height: 28,
+    marginRight: 8,
   },
   messageBubble: {
     borderRadius: 18,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginBottom: 2,
-  },
-  currentUserBubble: {
-    backgroundColor: Colors.primary,
-  },
-  otherUserBubble: {
-    backgroundColor: Colors.white,
-  },
-  messageText: {
-    fontSize: 16,
-  },
-  currentUserText: {
-    color: Colors.white,
-  },
-  otherUserText: {
-    color: Colors.text,
-  },
-  timestamp: {
-    fontSize: 11,
-    color: Colors.darkGray,
-    alignSelf: 'flex-end',
-    marginTop: 2,
-  },
-  dateSeparator: {
-    alignItems: 'center',
-    marginVertical: 15,
-  },
-  dateSeparatorText: {
-    backgroundColor: Colors.lightGray,
-    color: Colors.darkGray,
-    fontSize: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-  },
-  loadingContainer: {
-    padding: 10,
-  },
-  loadingBubble: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#E1E1E1',
-    borderRadius: 18,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    width: 70,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  userMessageBubble: {
+    backgroundColor: Colors.primary || '#3498db',
+  },
+  recipientMessageBubble: {
+    backgroundColor: '#FFFFFF',
+  },
+  messageText: {
+    fontSize: 15,
+    color: '#333',
+  },
+  userMessageText: {
+    color: '#FFFFFF',
+  },
+  timestampText: {
+    fontSize: 10,
+    color: '#AAA',
+    alignSelf: 'flex-end',
+    marginTop: 3,
   },
   inputContainer: {
     flexDirection: 'row',
     padding: 10,
-    backgroundColor: Colors.white,
-    alignItems: 'center',
-  },
-  attachButton: {
-    padding: 8,
+    paddingHorizontal: 15,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#EEEEEE',
+    zIndex: 100,
+    elevation: 5, // For Android
+    position: 'relative', // Ensure proper stacking
+    marginBottom: Platform.OS === 'android' ? 10 : 0, // Add some bottom margin on Android
   },
   input: {
     flex: 1,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#F5F5F5',
     borderRadius: 20,
     paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingVertical: 8,
     maxHeight: 100,
-    marginHorizontal: 8,
+    color: '#333333', // Added explicit text color
+    fontSize: 15,
   },
   sendButton: {
-    backgroundColor: Colors.primary,
-    padding: 8,
-    borderRadius: 20,
-  },
-  micButton: {
-    padding: 8,
+    backgroundColor: Colors.primary || '#3498db',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
   },
 });
 

@@ -6,8 +6,7 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
-  Switch,
-  Alert,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -18,7 +17,7 @@ const ProfileScreen = ({ navigation }) => {
   const { logout, userType } = useAuth();
   
   // Mock user data
-  const [user, setUser] = useState({
+  const [user] = useState({
     name: 'John Smith',
     email: 'john.smith@example.com',
     phone: '+60 12-345-6789',
@@ -26,6 +25,8 @@ const ProfileScreen = ({ navigation }) => {
     location: 'Kuala Lumpur, Malaysia',
     memberSince: 'January 2025',
     completedProjects: 8,
+    rating: 4.8,
+    reviews: 5,
     bio: userType === 'handyman' 
       ? 'Professional handyman with 10+ years of experience in plumbing, electrical work, and general repairs.' 
       : 'Looking for reliable handymen for home improvement projects.',
@@ -33,69 +34,25 @@ const ProfileScreen = ({ navigation }) => {
     hourlyRate: userType === 'handyman' ? 35 : null,
   });
 
-  // Settings state
-  const [notifications, setNotifications] = useState(true);
-  const [emailUpdates, setEmailUpdates] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
-  const [locationServices, setLocationServices] = useState(true);
-
   const handleLogout = () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Log Out',
-          onPress: () => {
-            // Call logout function from Auth Context
-            logout();
-          },
-        },
-      ]
-    );
+    logout();
   };
   
   const handleEditProfile = () => {
     navigation.navigate('EditProfile', { userData: user });
   };
 
-  // Render settings item if applicable
-  const renderSettingItem = (
-    title,
-    value,
-    setValue,
-    icon,
-    description = null
-  ) => (
-    <View style={styles.settingItem}>
-      <View style={styles.settingLeft}>
-        <Ionicons name={icon} size={24} color={Colors.primary} style={styles.settingIcon} />
-        <View>
-          <Text style={styles.settingTitle}>{title}</Text>
-          {description && <Text style={styles.settingDescription}>{description}</Text>}
-        </View>
-      </View>
-      <Switch
-        trackColor={{ false: Colors.mediumGray, true: Colors.primary }}
-        thumbColor={Colors.white}
-        ios_backgroundColor={Colors.mediumGray}
-        onValueChange={setValue}
-        value={value}
-      />
-    </View>
+  const renderSectionTitle = (title) => (
+    <Text style={styles.sectionTitle}>{title}</Text>
   );
-  
+
   // Only show skills section for handyman
   const renderSkills = () => {
     if (userType !== 'handyman' || !user.skills || user.skills.length === 0) return null;
     
     return (
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Skills & Services</Text>
+      <View style={styles.skillSection}>
+        {renderSectionTitle('Skills')}
         <View style={styles.skillsList}>
           {user.skills.map((skill, index) => (
             <View key={index} style={styles.skillTag}>
@@ -107,317 +64,303 @@ const ProfileScreen = ({ navigation }) => {
     );
   };
 
-  return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Image source={{ uri: user.avatar }} style={styles.avatar} />
-        <Text style={styles.name}>{user.name}</Text>
-        <Text style={styles.location}>{user.location}</Text>
-        <Text style={styles.memberSince}>Member since {user.memberSince}</Text>
-        
-        {userType === 'customer' ? (
-          <View style={styles.userTypeIndicator}>
-            <Ionicons name="person" size={16} color={Colors.white} />
-            <Text style={styles.userTypeText}>Customer</Text>
-          </View>
-        ) : (
-          <View style={styles.userTypeIndicator}>
-            <Ionicons name="hammer" size={16} color={Colors.white} />
-            <Text style={styles.userTypeText}>Handyman</Text>
-          </View>
-        )}
-        
-        {userType === 'handyman' && user.hourlyRate && (
-          <Text style={styles.hourlyRate}>RM{user.hourlyRate}/hour</Text>
-        )}
+  const renderInfoItem = (icon, label, value) => (
+    <View style={styles.infoItem}>
+      <Ionicons name={icon} size={18} color={Colors.primary} />
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </View>
+  );
 
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container}>
+        {/* Header with basic info */}
+        <View style={styles.header}>
+          <Image source={{ uri: user.avatar }} style={styles.avatar} />
+          
+          <View style={styles.userInfo}>
+            <Text style={styles.name}>{user.name}</Text>
+            <Text style={styles.location}>
+              <Ionicons name="location-outline" size={14} color="#777" /> {user.location}
+            </Text>
+            
+            {userType === 'handyman' && (
+              <View style={styles.rateTag}>
+                <Text style={styles.rateText}>RM{user.hourlyRate}/hr</Text>
+              </View>
+            )}
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.editButton}
+            onPress={handleEditProfile}
+          >
+            <Ionicons name="pencil" size={18} color={Colors.primary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Stats */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{user.completedProjects}</Text>
             <Text style={styles.statLabel}>Projects</Text>
           </View>
-          <View style={styles.statDivider} />
+          
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>5</Text>
+            <Text style={styles.statValue}>{user.reviews}</Text>
             <Text style={styles.statLabel}>Reviews</Text>
           </View>
-          <View style={styles.statDivider} />
+          
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>4.8</Text>
+            <Text style={styles.statValue}>{user.rating}</Text>
             <Text style={styles.statLabel}>Rating</Text>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.editProfileButton} onPress={handleEditProfile}>
-          <Text style={styles.editProfileButtonText}>Edit Profile</Text>
-        </TouchableOpacity>
-      </View>
-      
-      {user.bio ? (
+        {/* Type badge and bio */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <Text style={styles.bioText}>{user.bio}</Text>
+          <View style={styles.typeBadge}>
+            <Ionicons 
+              name={userType === 'handyman' ? 'hammer-outline' : 'person-outline'} 
+              size={16} 
+              color={Colors.white} 
+            />
+            <Text style={styles.typeText}>
+              {userType === 'handyman' ? 'Handyman' : 'Customer'}
+            </Text>
+          </View>
+          
+          {user.bio && (
+            <Text style={styles.bioText}>{user.bio}</Text>
+          )}
         </View>
-      ) : null}
-      
-      {renderSkills()}
+        
+        {/* Skills for handyman */}
+        {renderSkills()}
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account Information</Text>
-        <View style={styles.infoItem}>
-          <Ionicons name="mail" size={20} color={Colors.primary} style={styles.infoIcon} />
-          <Text style={styles.infoLabel}>Email:</Text>
-          <Text style={styles.infoValue}>{user.email}</Text>
+        {/* Contact information */}
+        <View style={styles.section}>
+          {renderSectionTitle('Contact Information')}
+          {renderInfoItem('mail-outline', 'Email', user.email)}
+          {renderInfoItem('call-outline', 'Phone', user.phone)}
         </View>
-        <View style={styles.infoItem}>
-          <Ionicons name="call" size={20} color={Colors.primary} style={styles.infoIcon} />
-          <Text style={styles.infoLabel}>Phone:</Text>
-          <Text style={styles.infoValue}>{user.phone}</Text>
-        </View>
-        <View style={styles.infoItem}>
-          <Ionicons name="calendar" size={20} color={Colors.primary} style={styles.infoIcon} />
-          <Text style={styles.infoLabel}>Member Since:</Text>
-          <Text style={styles.infoValue}>{user.memberSince}</Text>
-        </View>
-        <View style={styles.infoItem}>
-          <Ionicons name="location" size={20} color={Colors.primary} style={styles.infoIcon} />
-          <Text style={styles.infoLabel}>Location:</Text>
-          <Text style={styles.infoValue}>{user.location}</Text>
-        </View>
-      </View>
-      
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Settings</Text>
-        {renderSettingItem(
-          'Push Notifications',
-          notifications,
-          setNotifications,
-          'notifications',
-          'Receive notifications for project updates and offers'
-        )}
-        {renderSettingItem(
-          'Email Updates',
-          emailUpdates,
-          setEmailUpdates,
-          'mail',
-          'Receive promotional offers and newsletters'
-        )}
-        {renderSettingItem(
-          'Dark Mode',
-          darkMode,
-          setDarkMode,
-          'moon',
-          'Enable dark mode for the app interface'
-        )}
-        {renderSettingItem(
-          'Location Services',
-          locationServices,
-          setLocationServices,
-          'location',
-          'Allow the app to access your location'
-        )}
-      </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out" size={20} color={Colors.white} style={styles.logoutIcon} />
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
+        {/* Account information */}
+        <View style={styles.section}>
+          {renderSectionTitle('Account Information')}
+          {renderInfoItem('calendar-outline', 'Member Since', user.memberSince)}
+        </View>
 
-      <View style={styles.version}>
+        {/* Actions */}
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Settings')}>
+            <Ionicons name="settings-outline" size={22} color="#666" />
+            <Text style={styles.actionText}>Settings</Text>
+            <Ionicons name="chevron-forward" size={18} color="#CCC" style={styles.actionArrow} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Help')}>
+            <Ionicons name="help-circle-outline" size={22} color="#666" />
+            <Text style={styles.actionText}>Help & Support</Text>
+            <Ionicons name="chevron-forward" size={18} color="#CCC" style={styles.actionArrow} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={22} color="#FF6B6B" />
+            <Text style={styles.logoutText}>Log Out</Text>
+            <View style={styles.actionArrow} />
+          </TouchableOpacity>
+        </View>
+        
+        {/* Version info */}
         <Text style={styles.versionText}>TooKang v1.0.0</Text>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FAFAFA',
+  },
   container: {
     flex: 1,
-    backgroundColor: Colors.lightGray,
   },
   header: {
-    backgroundColor: Colors.white,
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    paddingTop: 30,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
     marginBottom: 10,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 15,
-    borderWidth: 3,
-    borderColor: Colors.primary,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    marginRight: 14,
+  },
+  userInfo: {
+    flex: 1,
   },
   name: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 5,
+    color: '#333333',
+    marginBottom: 4,
   },
   location: {
     fontSize: 14,
-    color: Colors.darkGray,
-    marginBottom: 5,
+    color: '#777777',
+    marginBottom: 6,
   },
-  memberSince: {
-    fontSize: 12,
-    color: Colors.darkGray,
-    marginBottom: 10,
+  rateTag: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E8F5FF',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 12,
   },
-  userTypeIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    paddingVertical: 5,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    marginBottom: 5,
-  },
-  userTypeText: {
-    color: Colors.white,
-    fontWeight: 'bold',
-    marginLeft: 5,
-  },
-  hourlyRate: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  rateText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: Colors.primary,
-    marginBottom: 15,
+  },
+  editButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#EEEEEE',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statsContainer: {
     flexDirection: 'row',
-    marginBottom: 20,
-    width: '100%',
-    justifyContent: 'space-around',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 14,
+    marginBottom: 10,
   },
   statItem: {
-    alignItems: 'center',
     flex: 1,
+    alignItems: 'center',
   },
   statValue: {
     fontSize: 18,
     fontWeight: 'bold',
     color: Colors.primary,
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
-    color: Colors.darkGray,
-  },
-  statDivider: {
-    width: 1,
-    height: '100%',
-    backgroundColor: Colors.lightGray,
-  },
-  editProfileButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-  },
-  editProfileButtonText: {
-    color: Colors.white,
-    fontWeight: 'bold',
+    fontSize: 13,
+    color: '#777777',
   },
   section: {
-    backgroundColor: Colors.white,
-    padding: 15,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    marginBottom: 10,
+  },
+  skillSection: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
     marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 15,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 12,
+  },
+  typeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.primary,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  typeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginLeft: 4,
   },
   bioText: {
     fontSize: 14,
-    color: Colors.text,
     lineHeight: 20,
+    color: '#555555',
   },
   skillsList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   skillTag: {
-    backgroundColor: Colors.lightGray,
-    borderRadius: 20,
-    paddingVertical: 5,
-    paddingHorizontal: 15,
-    marginRight: 10,
-    marginBottom: 10,
+    backgroundColor: '#F0F0F0',
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    marginBottom: 8,
   },
   skillText: {
-    color: Colors.text,
+    fontSize: 13,
+    color: '#555555',
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  infoIcon: {
-    marginRight: 10,
+    marginBottom: 14,
   },
   infoLabel: {
     fontSize: 14,
-    color: Colors.darkGray,
-    width: 100,
+    color: '#777777',
+    marginLeft: 10,
+    width: 80,
   },
   infoValue: {
     fontSize: 14,
-    color: Colors.text,
+    color: '#333333',
     flex: 1,
   },
-  settingItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
+  actionsContainer: {
+    backgroundColor: '#FFFFFF',
+    marginBottom: 20,
   },
-  settingLeft: {
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  actionText: {
+    fontSize: 15,
+    color: '#333333',
+    marginLeft: 12,
     flex: 1,
-  },
-  settingIcon: {
-    marginRight: 10,
-  },
-  settingTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: Colors.text,
-  },
-  settingDescription: {
-    fontSize: 12,
-    color: Colors.darkGray,
-    marginTop: 2,
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    backgroundColor: Colors.error,
-    margin: 15,
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoutIcon: {
-    marginRight: 10,
   },
   logoutText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    color: '#FF6B6B',
+    marginLeft: 12,
+    flex: 1,
   },
-  version: {
+  actionArrow: {
+    width: 20,
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   versionText: {
     fontSize: 12,
-    color: Colors.darkGray,
-  },
+    color: '#999999',
+    textAlign: 'center',
+    marginVertical: 20,
+  }
 });
 
 export default ProfileScreen;

@@ -1,3 +1,5 @@
+// Full AppNavigator.js with ProjectDetailScreen added
+
 import React from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -22,6 +24,7 @@ import ChatScreen from '../screens/ChatScreen';
 
 // Import screens for Handyman side
 import HandymanHomeScreen from '../screens/HandymanHomeScreen';
+import ProjectDetailScreen from '../screens/ProjectDetailScreen'; // Added import for ProjectDetailScreen
 
 // Import auth screens
 import LoginScreen from '../screens/LoginScreen';
@@ -169,6 +172,12 @@ function HandymanStack() {
             />
           ),
         })}
+      />
+      {/* Added ProjectDetails screen to the Handyman Stack */}
+      <Stack.Screen 
+        name="ProjectDetails" 
+        component={ProjectDetailScreen} 
+        options={{ title: 'Project Details' }} 
       />
     </Stack.Navigator>
   );

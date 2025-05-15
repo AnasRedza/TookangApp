@@ -7,26 +7,46 @@ import {
   ScrollView,
   TouchableOpacity,
   FlatList,
+  SafeAreaView,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 
 const HandymanDetailScreen = ({ route, navigation }) => {
+  // Get handyman data from route params or use defaults if not available
   const { handyman } = route.params || {
-    id: '1',
-    name: 'Default Handyman',
-    profession: 'General',
-    rating: 4.5,
-    reviews: 0,
-    hourlyRate: 0,
-    avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
-    description: 'No description available.',
-    categories: [],
-    completedJobs: 0,
+    handyman: {
+      id: '1',
+      name: 'Default Handyman',
+      profession: 'General',
+      rating: 4.5,
+      reviews: 0,
+      hourlyRate: 0,
+      avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
+      description: 'No description available.',
+      categories: [],
+      completedJobs: 0,
+    }
   };
 
-  // Mock reviews
+  // State for read more functionality
+  const [showFullDescription, setShowFullDescription] = useState(false);
+  const [showAllPrices, setShowAllPrices] = useState(false);
+  
+  // Mock price list for services/items
+  const priceList = [
+    { id: '1', service: 'Basic Plumbing Service', price: 50 },
+    { id: '2', service: 'Sink Installation', price: 120 },
+    { id: '3', service: 'Toilet Repair', price: 80 },
+    { id: '4', service: 'Pipe Replacement (per foot)', price: 15 },
+    { id: '5', service: 'Shower Installation', price: 250 },
+    { id: '6', service: 'Water Heater Repair', price: 100 },
+    { id: '7', service: 'Water Heater Installation', price: 350 },
+    { id: '8', service: 'Drain Cleaning', price: 75 },
+  ];
+  
+  // Mock reviews for demonstration
   const mockReviews = [
     {
       id: '1',
@@ -54,44 +74,41 @@ const HandymanDetailScreen = ({ route, navigation }) => {
     },
   ];
 
-  // Replace the current handleBidProject function in HandymanDetailScreen.js with this:
-
-const handleBidProject = () => {
-    Alert.alert(
-      'Create Project Bid',
-      `Would you like to create a project bid for ${handyman.name}?`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Create Bid',
-          onPress: () => {
-            // Navigate to bid creation screen
-            navigation.navigate('ProjectBid', { handyman });
-          },
-        },
-      ]
-    );
+  // Function to handle bidding on a project
+  const handleBidProject = () => {
+    navigation.navigate('ProjectBid', { handyman });
   };
 
+  // Function to message the handyman
+  const handleMessageHandyman = () => {
+    navigation.navigate('Chat', { recipient: handyman });
+  };
+
+  // Render rating stars
   const renderRatingStars = (rating) => {
     const stars = [];
+    const fullStars = Math.floor(rating);
+    const halfStar = rating % 1 >= 0.5;
+    
     for (let i = 1; i <= 5; i++) {
-      stars.push(
-        <Ionicons
-          key={i}
-          name={i <= rating ? 'star' : 'star-outline'}
-          size={16}
-          color={i <= rating ? Colors.accent : Colors.mediumGray}
-          style={{ marginRight: 2 }}
-        />
-      );
+      if (i <= fullStars) {
+        stars.push(
+          <Ionicons key={i} name="star" size={16} color="#FFD700" style={{ marginRight: 2 }} />
+        );
+      } else if (i === fullStars + 1 && halfStar) {
+        stars.push(
+          <Ionicons key={i} name="star-half" size={16} color="#FFD700" style={{ marginRight: 2 }} />
+        );
+      } else {
+        stars.push(
+          <Ionicons key={i} name="star-outline" size={16} color="#FFD700" style={{ marginRight: 2 }} />
+        );
+      }
     }
     return stars;
   };
 
+  // Render a review item
   const renderReviewItem = ({ item }) => (
     <View style={styles.reviewItem}>
       <View style={styles.reviewHeader}>
@@ -109,229 +126,278 @@ const handleBidProject = () => {
   );
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Image source={{ uri: handyman.avatar }} style={styles.avatar} />
-        <View style={styles.headerInfo}>
-          <Text style={styles.name}>{handyman.name}</Text>
-          <Text style={styles.profession}>{handyman.profession}</Text>
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={16} color={Colors.accent} />
-            <Text style={styles.rating}>{handyman.rating.toFixed(1)}</Text>
-            <Text style={styles.reviews}>({handyman.reviews} reviews)</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About</Text>
-        <Text style={styles.description}>{handyman.description}</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Services</Text>
-        <View style={styles.categories}>
-          {handyman.categories && handyman.categories.map((category, index) => (
-            <View key={index} style={styles.categoryTag}>
-              <Text style={styles.categoryText}>{category}</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container}>
+        {/* Header with avatar and basic info */}
+        <View style={styles.header}>
+          <Image 
+            source={{ uri: handyman.avatar || handyman.profilePicture }} 
+            style={styles.avatar} 
+          />
+          <View style={styles.headerInfo}>
+            <Text style={styles.name}>{handyman.name}</Text>
+            <Text style={styles.profession}>{handyman.profession}</Text>
+            <View style={styles.ratingContainer}>
+              {renderRatingStars(handyman.rating)}
+              <Text style={styles.reviewCount}>
+                ({handyman.reviews || handyman.totalReviews || 0} reviews)
+              </Text>
             </View>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Pricing</Text>
-        <View style={styles.priceCard}>
-          <Text style={styles.priceTitle}>Hourly Rate</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.price}>RM{handyman.hourlyRate}</Text>
-            <Text style={styles.priceUnit}>/hour</Text>
-          </View>
-          <Text style={styles.priceNote}>
-            * Final price may vary based on project complexity and materials needed
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Stats</Text>
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
-            <Text style={styles.statValue}>{handyman.completedJobs}</Text>
-            <Text style={styles.statLabel}>Jobs Completed</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Ionicons name="star" size={24} color={Colors.accent} />
-            <Text style={styles.statValue}>{handyman.rating.toFixed(1)}</Text>
-            <Text style={styles.statLabel}>Average Rating</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Ionicons name="chatbubble" size={24} color={Colors.primary} />
-            <Text style={styles.statValue}>{handyman.reviews}</Text>
-            <Text style={styles.statLabel}>Reviews</Text>
           </View>
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <View style={styles.reviewsHeader}>
-          <Text style={styles.sectionTitle}>Reviews</Text>
-          <TouchableOpacity>
-            <Text style={styles.seeAllText}>See All</Text>
+        {/* Action Buttons */}
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity 
+            style={styles.messageButton}
+            onPress={handleMessageHandyman}
+          >
+            <Ionicons name="chatbubble-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.buttonText}>Message</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.bidButton}
+            onPress={handleBidProject}
+          >
+            <Ionicons name="hammer-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.buttonText}>Create Project Bid</Text>
           </TouchableOpacity>
         </View>
-        <FlatList
-          data={mockReviews}
-          renderItem={renderReviewItem}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-        />
-      </View>
 
-      <TouchableOpacity
-        style={styles.bidButton}
-        onPress={handleBidProject}
-      >
-        <Text style={styles.bidButtonText}>Bid Project with {handyman.name}</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {/* Hourly Rate Banner */}
+        <View style={styles.rateContainer}>
+          <Text style={styles.rateLabel}>Hourly Rate</Text>
+          <Text style={styles.rateValue}>RM {handyman.hourlyRate}/hr</Text>
+        </View>
+        
+        {/* About Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.description} numberOfLines={showFullDescription ? undefined : 3}>
+            {handyman.description || handyman.about || 'No description available.'}
+          </Text>
+          {(handyman.description?.length > 120 || handyman.about?.length > 120) && (
+            <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)}>
+              <Text style={styles.readMoreText}>
+                {showFullDescription ? 'Read less' : 'Read more'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Services/Categories Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Services</Text>
+          <View style={styles.categoriesContainer}>
+            {(handyman.categories || handyman.skills || []).map((category, index) => (
+              <View key={index} style={styles.categoryTag}>
+                <Text style={styles.categoryText}>{category}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Price List Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>Price List</Text>
+            <TouchableOpacity onPress={() => setShowAllPrices(!showAllPrices)}>
+              <Text style={styles.seeAllText}>
+                {showAllPrices ? 'Show Less' : 'See All'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.priceListContainer}>
+            {priceList.slice(0, showAllPrices ? priceList.length : 4).map((item) => (
+              <View key={item.id} style={styles.priceListItem}>
+                <Text style={styles.priceListService}>{item.service}</Text>
+                <Text style={styles.priceListPrice}>RM {item.price}</Text>
+              </View>
+            ))}
+          </View>
+          
+          <View style={styles.priceNotesContainer}>
+            <Ionicons name="information-circle-outline" size={16} color="#999999" />
+            <Text style={styles.priceNotes}>
+              Prices may vary based on job complexity and materials needed. Final quotation will be provided after assessment.
+            </Text>
+          </View>
+        </View>
+
+        {/* Stats Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Experience & Stats</Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="briefcase-outline" size={22} color={Colors.primary} />
+              </View>
+              <Text style={styles.statValue}>{handyman.yearsExperience || '5'}+ years</Text>
+              <Text style={styles.statLabel}>Experience</Text>
+            </View>
+            
+            <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="checkmark-circle-outline" size={22} color={Colors.primary} />
+              </View>
+              <Text style={styles.statValue}>{handyman.completedJobs || handyman.completedProjects || 85}</Text>
+              <Text style={styles.statLabel}>Projects Done</Text>
+            </View>
+            
+            <View style={styles.statItem}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="time-outline" size={22} color={Colors.primary} />
+              </View>
+              <Text style={styles.statValue}>95%</Text>
+              <Text style={styles.statLabel}>On-time</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Reviews Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>Reviews</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {/* Reviews List */}
+          {mockReviews.length > 0 ? (
+            <FlatList
+              data={mockReviews.slice(0, 3)}
+              renderItem={renderReviewItem}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+              ItemSeparatorComponent={() => <View style={styles.reviewSeparator} />}
+              contentContainerStyle={styles.reviewsContainer}
+            />
+          ) : (
+            <Text style={styles.noReviewsText}>No reviews yet</Text>
+          )}
+        </View>
+        
+        {/* Bottom padding */}
+        <View style={{ height: 20 }} />
+        
+        {/* Fixed Bid Button at bottom */}
+        <View style={styles.fixedBottomContainer}>
+          <TouchableOpacity
+            style={styles.fixedBidButton}
+            onPress={handleBidProject}
+          >
+            <Text style={styles.fixedBidButtonText}>Hire {handyman.name.split(' ')[0]}</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F6F8FA',
+  },
   container: {
     flex: 1,
-    backgroundColor: Colors.lightGray,
   },
   header: {
     flexDirection: 'row',
     padding: 20,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.lightGray,
+    backgroundColor: '#FFFFFF',
   },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
+    borderWidth: 2,
+    borderColor: '#E8E8E8',
   },
   headerInfo: {
     marginLeft: 15,
     justifyContent: 'center',
+    flex: 1,
   },
   name: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: '#333333',
+    marginBottom: 4,
   },
   profession: {
     fontSize: 16,
-    color: Colors.darkGray,
-    marginBottom: 5,
+    color: '#666666',
+    marginBottom: 6,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  rating: {
+  reviewCount: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginLeft: 4,
+    color: '#666666',
+    marginLeft: 5,
   },
-  reviews: {
-    fontSize: 12,
-    color: Colors.darkGray,
-    marginLeft: 4,
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+  },
+  messageButton: {
+    flex: 1,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  bidButton: {
+    flex: 2,
+    backgroundColor: Colors.primary || '#3498db',
+    paddingVertical: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  rateContainer: {
+    backgroundColor: Colors.primary || '#3498db',
+    padding: 15,
+    alignItems: 'center',
+  },
+  rateLabel: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+  },
+  rateValue: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: 'bold',
   },
   section: {
-    backgroundColor: Colors.white,
+    backgroundColor: '#FFFFFF',
+    marginTop: 10,
     padding: 20,
-    marginBottom: 10,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: '#333333',
     marginBottom: 15,
   },
-  description: {
-    fontSize: 16,
-    color: Colors.text,
-    lineHeight: 24,
-  },
-  categories: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  categoryTag: {
-    backgroundColor: Colors.lightGray,
-    borderRadius: 15,
-    paddingVertical: 5,
-    paddingHorizontal: 15,
-    marginRight: 10,
-    marginBottom: 10,
-  },
-  categoryText: {
-    fontSize: 14,
-    color: Colors.text,
-  },
-  priceCard: {
-    backgroundColor: Colors.lightGray,
-    borderRadius: 10,
-    padding: 15,
-  },
-  priceTitle: {
-    fontSize: 14,
-    color: Colors.darkGray,
-    marginBottom: 5,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  price: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: Colors.primary,
-  },
-  priceUnit: {
-    fontSize: 14,
-    color: Colors.darkGray,
-    marginLeft: 4,
-  },
-  priceNote: {
-    fontSize: 12,
-    color: Colors.darkGray,
-    marginTop: 10,
-    fontStyle: 'italic',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 10,
-    backgroundColor: Colors.lightGray,
-    borderRadius: 10,
-    marginHorizontal: 5,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginTop: 5,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: Colors.darkGray,
-    marginTop: 5,
-    textAlign: 'center',
-  },
-  reviewsHeader: {
+  sectionTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -339,19 +405,77 @@ const styles = StyleSheet.create({
   },
   seeAllText: {
     fontSize: 14,
-    color: Colors.primary,
+    color: Colors.primary || '#3498db',
+    fontWeight: '600',
+  },
+  description: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#555555',
+  },
+  readMoreText: {
+    marginTop: 5,
+    color: Colors.primary || '#3498db',
+    fontWeight: '600',
+  },
+  categoriesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  categoryTag: {
+    backgroundColor: '#EBF5FF',
+    borderRadius: 15,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  categoryText: {
+    fontSize: 14,
+    color: Colors.primary || '#3498db',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 10,
+  },
+  statIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#F0F7FC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 16,
     fontWeight: 'bold',
+    color: '#333333',
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#666666',
+    marginTop: 2,
+  },
+  reviewsContainer: {
+    paddingBottom: 10,
   },
   reviewItem: {
-    backgroundColor: Colors.lightGray,
-    borderRadius: 10,
     padding: 15,
-    marginBottom: 10,
+  },
+  reviewSeparator: {
+    height: 1,
+    backgroundColor: '#EEEEEE',
+    marginVertical: 5,
   },
   reviewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
     marginBottom: 5,
   },
   reviewUser: {
@@ -360,8 +484,8 @@ const styles = StyleSheet.create({
   reviewUserName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 3,
+    color: '#333333',
+    marginBottom: 4,
   },
   reviewRating: {
     flexDirection: 'row',
@@ -369,28 +493,86 @@ const styles = StyleSheet.create({
   },
   reviewDate: {
     fontSize: 12,
-    color: Colors.darkGray,
+    color: '#999999',
   },
   reviewProject: {
     fontSize: 14,
-    color: Colors.primary,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    color: Colors.primary || '#3498db',
     marginBottom: 5,
   },
   reviewComment: {
     fontSize: 14,
-    color: Colors.text,
     lineHeight: 20,
+    color: '#555555',
   },
-  bidButton: {
-    backgroundColor: Colors.primary,
-    margin: 20,
-    padding: 15,
+  noReviewsText: {
+    fontSize: 14,
+    color: '#999999',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  priceListContainer: {
+    marginBottom: 10,
+  },
+  priceListItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  priceListService: {
+    fontSize: 15,
+    color: '#333333',
+    flex: 1,
+    paddingRight: 10,
+  },
+  priceListPrice: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#333333',
+  },
+  priceNotesContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F8F8F8',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 10,
+    alignItems: 'flex-start',
+  },
+  priceNotes: {
+    fontSize: 13,
+    color: '#666666',
+    flex: 1,
+    marginLeft: 8,
+    lineHeight: 18,
+  },
+  fixedBottomContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#EEEEEE',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  fixedBidButton: {
+    backgroundColor: Colors.primary || '#3498db',
+    paddingVertical: 15,
     borderRadius: 10,
     alignItems: 'center',
   },
-  bidButtonText: {
-    color: Colors.white,
+  fixedBidButtonText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
   },

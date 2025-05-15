@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  TextInput,
+  SafeAreaView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -106,10 +106,7 @@ const HANDYMAN_CONVERSATIONS = [
 
 const ChatListScreen = ({ navigation }) => {
   const { userType } = useAuth();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [conversations, setConversations] = useState(
-    userType === 'customer' ? MOCK_CONVERSATIONS : HANDYMAN_CONVERSATIONS
-  );
+  const conversations = userType === 'customer' ? MOCK_CONVERSATIONS : HANDYMAN_CONVERSATIONS;
 
   const formatTimestamp = (timestamp) => {
     const messageDate = new Date(timestamp);
@@ -146,91 +143,50 @@ const ChatListScreen = ({ navigation }) => {
     });
   };
 
-  const renderItem = ({ item }) => {
-    // Skip if filtering by search query
-    if (
-      searchQuery && 
-      !item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      !item.project.toLowerCase().includes(searchQuery.toLowerCase())
-    ) {
-      return null;
-    }
-    
-    return (
-      <TouchableOpacity 
-        style={styles.conversationItem}
-        onPress={() => navigateToChat(item)}
-      >
-        <View style={styles.avatarContainer}>
-          <Image source={{ uri: item.avatar }} style={styles.avatar} />
-          {item.unread > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>{item.unread}</Text>
-            </View>
-          )}
-        </View>
-        
-        <View style={styles.conversationContent}>
-          <View style={styles.conversationHeader}>
-            <Text style={styles.name}>{item.name}</Text>
-            <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
+  const renderItem = ({ item }) => (
+    <TouchableOpacity 
+      style={styles.conversationItem}
+      onPress={() => navigateToChat(item)}
+    >
+      <View style={styles.avatarContainer}>
+        <Image source={{ uri: item.avatar }} style={styles.avatar} />
+        {item.unread > 0 && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadText}>{item.unread}</Text>
           </View>
-          
-          <View style={styles.conversationSubheader}>
-            <Text style={styles.projectName}>
-              {item.project}
-              {userType === 'customer' && item.service ? ` • ${item.service}` : ''}
-            </Text>
-          </View>
-          
-          <Text 
-            style={[styles.lastMessage, item.unread > 0 && styles.unreadMessage]}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-          >
-            {item.lastMessage}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const filtered = conversations.filter(conversation => {
-    if (!searchQuery) return true;
-    
-    return (
-      conversation.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      conversation.project.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (conversation.service && 
-       conversation.service.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-  });
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color={Colors.darkGray} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search conversations..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery ? (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={20} color={Colors.darkGray} />
-          </TouchableOpacity>
-        ) : null}
+        )}
       </View>
       
-      {filtered.length === 0 ? (
+      <View style={styles.conversationContent}>
+        <View style={styles.conversationHeader}>
+          <Text style={styles.name}>{item.name}</Text>
+          <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
+        </View>
+        
+        <Text style={styles.projectName}>
+          {item.project}
+        </Text>
+        
+        <Text 
+          style={[styles.lastMessage, item.unread > 0 && styles.unreadMessage]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {item.lastMessage}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Conversation List */}
+      {conversations.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubble-ellipses-outline" size={60} color={Colors.mediumGray} />
-          <Text style={styles.emptyTitle}>No Conversations</Text>
+          <Ionicons name="chatbubbles-outline" size={50} color="#CCC" />
+          <Text style={styles.emptyTitle}>No Messages</Text>
           <Text style={styles.emptyText}>
-            {searchQuery 
-              ? `No results found for "${searchQuery}"`
-              : `Start communicating with your ${userType === 'customer' ? 'handymen' : 'customers'}`}
+            You don't have any conversations yet
           </Text>
         </View>
       ) : (
@@ -238,105 +194,82 @@ const ChatListScreen = ({ navigation }) => {
           data={conversations}
           renderItem={renderItem}
           keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
         />
       )}
-      
-      <TouchableOpacity style={styles.newChatButton}>
-        <Ionicons name="add" size={24} color={Colors.white} />
-      </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.lightGray,
-    borderRadius: 10,
-    margin: 15,
-    paddingHorizontal: 15,
-    height: 45,
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-  },
-  listContent: {
-    paddingBottom: 80, // Extra space for the FAB
+    backgroundColor: '#FFFFFF',
   },
   conversationItem: {
     flexDirection: 'row',
-    padding: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.lightGray,
+    borderBottomColor: '#F0F0F0',
   },
   avatarContainer: {
     position: 'relative',
-    marginRight: 15,
+    marginRight: 12,
   },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   unreadBadge: {
     position: 'absolute',
-    right: 0,
-    top: 0,
-    backgroundColor: Colors.primary,
+    right: -2,
+    top: -2,
+    backgroundColor: Colors.primary || '#3498db',
     borderRadius: 10,
-    width: 20,
-    height: 20,
+    minWidth: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 4,
   },
   unreadText: {
-    color: Colors.white,
-    fontSize: 12,
+    color: '#FFFFFF',
+    fontSize: 11,
     fontWeight: 'bold',
   },
   conversationContent: {
     flex: 1,
+    justifyContent: 'center',
   },
   conversationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   name: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: '#333',
   },
   timestamp: {
     fontSize: 12,
-    color: Colors.darkGray,
-  },
-  conversationSubheader: {
-    marginBottom: 5,
+    color: '#999',
   },
   projectName: {
     fontSize: 13,
-    color: Colors.primary,
-    fontWeight: '500',
+    color: Colors.primary || '#3498db',
+    marginBottom: 4,
   },
   lastMessage: {
     fontSize: 14,
-    color: Colors.darkGray,
+    color: '#777',
+    lineHeight: 20,
   },
   unreadMessage: {
-    fontWeight: 'bold',
-    color: Colors.text,
+    fontWeight: '600',
+    color: '#333',
   },
   emptyContainer: {
     flex: 1,
@@ -347,31 +280,15 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
-    marginTop: 15,
-    marginBottom: 5,
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: Colors.darkGray,
+    color: '#999',
     textAlign: 'center',
-  },
-  newChatButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    backgroundColor: Colors.primary,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
+  }
 });
 
 export default ChatListScreen;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -13,12 +13,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import Colors from '../constants/Colors';
 
 const EditProfileScreen = ({ navigation, route }) => {
-  const { userType, updateUserProfile } = useAuth();
+  const { userType } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   
   // Get user data from params or use defaults
@@ -37,21 +36,8 @@ const EditProfileScreen = ({ navigation, route }) => {
   
   // Form state
   const [userData, setUserData] = useState(initialUserData);
-  const [avatarUpdated, setAvatarUpdated] = useState(false);
   const [newSkill, setNewSkill] = useState('');
   
-  // Request permission for image library
-  useEffect(() => {
-    (async () => {
-      if (Platform.OS !== 'web') {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission required', 'Sorry, we need camera roll permissions to change your profile picture.');
-        }
-      }
-    })();
-  }, []);
-
   const handleInputChange = (field, value) => {
     setUserData({ ...userData, [field]: value });
   };
@@ -70,215 +56,161 @@ const EditProfileScreen = ({ navigation, route }) => {
     setUserData({ ...userData, skills: updatedSkills });
   };
 
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setUserData({ ...userData, avatar: result.assets[0].uri });
-      setAvatarUpdated(true);
-    }
+  const handleSelectImage = () => {
+    // In a real app, this would use ImagePicker
+    Alert.alert(
+      'Change Profile Picture',
+      'This would open your photo gallery in a real app.',
+      [{ text: 'OK' }]
+    );
   };
 
   const handleSave = () => {
-    // Validate inputs
-    if (!userData.name || !userData.email || !userData.phone) {
-      Alert.alert('Missing Information', 'Please fill in all required fields.');
+    // Basic validation
+    if (!userData.name.trim()) {
+      Alert.alert('Missing Information', 'Please enter your name.');
       return;
     }
-    
-    // Validate email format
+
+    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(userData.email)) {
       Alert.alert('Invalid Email', 'Please enter a valid email address.');
       return;
     }
     
-    // Validate phone format
-    const phoneRegex = /^\+?[\d\s-]{7,15}$/;
-    if (!phoneRegex.test(userData.phone)) {
-      Alert.alert('Invalid Phone Number', 'Please enter a valid phone number.');
-      return;
-    }
-    
-    // Show loading indicator
     setIsLoading(true);
     
     // Simulate API call
     setTimeout(() => {
       setIsLoading(false);
-      
-      // In a real app, you would update user profile using a function from Auth Context
-      // updateUserProfile(userData);
-      
-      Alert.alert(
-        'Profile Updated',
-        'Your profile information has been successfully updated.',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ]
-      );
-    }, 1500);
+      navigation.goBack();
+    }, 1000);
   };
+
+  const renderInputField = (label, field, placeholder, icon, keyboardType = 'default', multiline = false) => (
+    <View style={styles.inputGroup}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <View style={[styles.inputContainer, multiline && styles.multilineContainer]}>
+        {icon && <Ionicons name={icon} size={18} color="#999" style={styles.inputIcon} />}
+        <TextInput
+          style={[styles.input, multiline && styles.multilineInput]}
+          value={userData[field]}
+          onChangeText={(text) => handleInputChange(field, text)}
+          placeholder={placeholder}
+          keyboardType={keyboardType}
+          multiline={multiline}
+          placeholderTextColor="#999"
+        />
+      </View>
+    </View>
+  );
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.keyboardAvoid}
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      <ScrollView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.avatarContainer} onPress={pickImage}>
-            <Image source={{ uri: userData.avatar }} style={styles.avatar} />
-            <View style={styles.editAvatarButton}>
-              <Ionicons name="camera" size={16} color={Colors.white} />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Profile Picture */}
+        <View style={styles.profilePictureSection}>
+          <TouchableOpacity 
+            style={styles.avatarContainer}
+            onPress={handleSelectImage}
+          >
+            <Image 
+              source={{ uri: userData.avatar }} 
+              style={styles.avatar} 
+            />
+            <View style={styles.editIconContainer}>
+              <Ionicons name="camera" size={18} color="#FFF" />
             </View>
           </TouchableOpacity>
-          <Text style={styles.changePhotoText}>Tap to change photo</Text>
         </View>
 
-        <View style={styles.formSection}>
+        {/* Personal Information */}
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Personal Information</Text>
           
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Full Name</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={20} color={Colors.darkGray} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                value={userData.name}
-                onChangeText={(text) => handleInputChange('name', text)}
-                placeholder="Enter your full name"
-              />
-            </View>
-          </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="mail-outline" size={20} color={Colors.darkGray} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                value={userData.email}
-                onChangeText={(text) => handleInputChange('email', text)}
-                placeholder="Enter your email"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Phone Number</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="call-outline" size={20} color={Colors.darkGray} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                value={userData.phone}
-                onChangeText={(text) => handleInputChange('phone', text)}
-                placeholder="Enter your phone number"
-                keyboardType="phone-pad"
-              />
-            </View>
-          </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Location</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="location-outline" size={20} color={Colors.darkGray} style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                value={userData.location}
-                onChangeText={(text) => handleInputChange('location', text)}
-                placeholder="Enter your location"
-              />
-            </View>
-          </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Bio</Text>
-            <View style={[styles.inputContainer, styles.textAreaContainer]}>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={userData.bio}
-                onChangeText={(text) => handleInputChange('bio', text)}
-                placeholder="Tell us about yourself..."
-                multiline
-                numberOfLines={4}
-              />
-            </View>
-          </View>
+          {renderInputField('Name', 'name', 'Enter your name', 'person-outline')}
+          {renderInputField('Email', 'email', 'Enter your email', 'mail-outline', 'email-address')}
+          {renderInputField('Phone', 'phone', 'Enter your phone number', 'call-outline', 'phone-pad')}
+          {renderInputField('Location', 'location', 'City, Country', 'location-outline')}
+          {renderInputField('Bio', 'bio', 'Tell us about yourself...', null, 'default', true)}
         </View>
-        
+
+        {/* Professional Information (for handymen only) */}
         {userType === 'handyman' && (
-          <View style={styles.formSection}>
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Professional Information</Text>
             
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Hourly Rate (RM)</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="cash-outline" size={20} color={Colors.darkGray} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  value={userData.hourlyRate}
-                  onChangeText={(text) => handleInputChange('hourlyRate', text)}
-                  placeholder="Enter your hourly rate"
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
+            {renderInputField('Hourly Rate (RM)', 'hourlyRate', 'Enter your rate', 'cash-outline', 'numeric')}
             
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Skills & Services</Text>
-              <View style={styles.skillsList}>
-                {userData.skills.map((skill, index) => (
-                  <View key={index} style={styles.skillItem}>
-                    <Text style={styles.skillText}>{skill}</Text>
-                    <TouchableOpacity
-                      style={styles.removeSkillButton}
-                      onPress={() => handleRemoveSkill(index)}
-                    >
-                      <Ionicons name="close" size={16} color={Colors.white} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
+              <Text style={styles.inputLabel}>Skills</Text>
               
-              <View style={styles.addSkillContainer}>
-                <View style={[styles.inputContainer, { flex: 1 }]}>
-                  <Ionicons name="construct-outline" size={20} color={Colors.darkGray} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    value={newSkill}
-                    onChangeText={setNewSkill}
-                    placeholder="Add a skill or service"
-                  />
+              {/* Skills list */}
+              {userData.skills.length > 0 && (
+                <View style={styles.skillsList}>
+                  {userData.skills.map((skill, index) => (
+                    <View key={index} style={styles.skillItem}>
+                      <Text style={styles.skillText}>{skill}</Text>
+                      <TouchableOpacity
+                        style={styles.removeButton}
+                        onPress={() => handleRemoveSkill(index)}
+                      >
+                        <Ionicons name="close" size={14} color="#FFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
                 </View>
-                <TouchableOpacity style={styles.addButton} onPress={handleAddSkill}>
-                  <Ionicons name="add" size={24} color={Colors.white} />
+              )}
+              
+              {/* Add new skill */}
+              <View style={styles.addSkillRow}>
+                <TextInput
+                  style={styles.addSkillInput}
+                  value={newSkill}
+                  onChangeText={setNewSkill}
+                  placeholder="Add a skill"
+                  placeholderTextColor="#999"
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.addButton,
+                    !newSkill.trim() && styles.disabledButton
+                  ]}
+                  onPress={handleAddSkill}
+                  disabled={!newSkill.trim()}
+                >
+                  <Ionicons name="add" size={20} color="#FFF" />
                 </TouchableOpacity>
               </View>
             </View>
           </View>
         )}
         
+        {/* Save Button */}
         <TouchableOpacity
           style={styles.saveButton}
           onPress={handleSave}
           disabled={isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator color={Colors.white} size="small" />
+            <ActivityIndicator color="#FFF" size="small" />
           ) : (
-            <Text style={styles.saveButtonText}>Save Changes</Text>
+            <Text style={styles.saveButtonText}>Save</Text>
           )}
+        </TouchableOpacity>
+        
+        {/* Cancel Button */}
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={() => navigation.goBack()}
+          disabled={isLoading}
+        >
+          <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -286,146 +218,166 @@ const EditProfileScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  keyboardAvoid: {
-    flex: 1,
-  },
   container: {
     flex: 1,
-    backgroundColor: Colors.lightGray,
+    backgroundColor: '#F8F8F8',
   },
-  header: {
+  scrollContent: {
+    paddingBottom: 30,
+  },
+  profilePictureSection: {
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: Colors.white,
-    marginBottom: 10,
+    paddingVertical: 24,
+    backgroundColor: '#FFF',
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 10,
   },
   avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 3,
-    borderColor: Colors.primary,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
-  editAvatarButton: {
+  editIconContainer: {
     position: 'absolute',
     bottom: 0,
     right: 0,
     backgroundColor: Colors.primary,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: Colors.white,
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFF',
   },
-  changePhotoText: {
-    color: Colors.primary,
-    fontSize: 14,
-  },
-  formSection: {
-    backgroundColor: Colors.white,
-    padding: 15,
+  section: {
+    backgroundColor: '#FFF',
+    padding: 16,
     marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 15,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 16,
+    color: '#333',
   },
   inputGroup: {
-    marginBottom: 15,
+    marginBottom: 16,
   },
-  label: {
+  inputLabel: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: Colors.text,
     marginBottom: 8,
+    color: '#555',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.mediumGray,
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    height: 50,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    height: 44,
+    paddingHorizontal: 12,
+    backgroundColor: '#F9F9F9',
+  },
+  multilineContainer: {
+    height: 100,
+    alignItems: 'flex-start',
   },
   inputIcon: {
     marginRight: 10,
   },
   input: {
     flex: 1,
-    height: '100%',
-    color: Colors.text,
+    fontSize: 15,
+    color: '#333',
   },
-  textAreaContainer: {
+  multilineInput: {
     height: 100,
-    alignItems: 'flex-start',
-  },
-  textArea: {
-    height: '100%',
     textAlignVertical: 'top',
-    paddingTop: 15,
+    paddingTop: 12,
   },
   skillsList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   skillItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primary,
-    borderRadius: 20,
-    paddingVertical: 5,
-    paddingLeft: 15,
-    paddingRight: 5,
-    marginRight: 10,
-    marginBottom: 10,
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingRight: 6,
+    marginRight: 8,
+    marginBottom: 8,
   },
   skillText: {
-    color: Colors.white,
-    marginRight: 5,
+    color: '#FFF',
+    fontSize: 13,
+    marginRight: 4,
   },
-  removeSkillButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.2)',
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
+  removeButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.2)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  addSkillContainer: {
+  addSkillRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  addSkillInput: {
+    flex: 1,
+    height: 44,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    backgroundColor: '#F9F9F9',
+    fontSize: 15,
+    color: '#333',
+  },
   addButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
     backgroundColor: Colors.primary,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 10,
+    justifyContent: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#CCCCCC',
   },
   saveButton: {
     backgroundColor: Colors.primary,
-    margin: 15,
-    padding: 15,
-    borderRadius: 10,
+    height: 48,
+    borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 30,
+    justifyContent: 'center',
+    marginTop: 10,
+    marginHorizontal: 16,
   },
   saveButtonText: {
-    color: Colors.white,
+    color: '#FFF',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
+  },
+  cancelButton: {
+    height: 48,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    marginHorizontal: 16,
+  },
+  cancelButtonText: {
+    color: Colors.primary,
+    fontSize: 16,
   },
 });
 

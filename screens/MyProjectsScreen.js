@@ -5,13 +5,13 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 
 // Mock projects data
-const PROJECTS = [
+const MOCK_PROJECTS = [
   {
     id: '1',
     title: 'Fix leaking bathroom sink',
@@ -21,7 +21,6 @@ const PROJECTS = [
     location: 'Kuala Lumpur',
     date: '2025-05-10',
     status: 'Open',
-    bids: [],
   },
   {
     id: '2',
@@ -32,7 +31,6 @@ const PROJECTS = [
     location: 'Petaling Jaya',
     date: '2025-05-15',
     status: 'Open',
-    bids: [],
   },
   {
     id: '3',
@@ -43,7 +41,6 @@ const PROJECTS = [
     location: 'Subang Jaya',
     date: '2025-05-20',
     status: 'Ongoing',
-    bids: [],
     handyman: {
       id: '4',
       name: 'Sarah Williams',
@@ -58,7 +55,6 @@ const PROJECTS = [
     location: 'Kuala Lumpur',
     date: '2025-04-30',
     status: 'Completed',
-    bids: [],
     handyman: {
       id: '5',
       name: 'David Lee',
@@ -67,15 +63,13 @@ const PROJECTS = [
 ];
 
 const MyProjectsScreen = ({ navigation }) => {
-  const [projects, setProjects] = useState(PROJECTS);
-  const [activeTab, setActiveTab] = useState('all'); // 'all', 'open', 'ongoing', 'completed'
+  const [projects, setProjects] = useState(MOCK_PROJECTS);
+  const [activeTab, setActiveTab] = useState('all');
 
-  const filteredProjects = projects.filter((project) => {
+  // Filter projects based on active tab
+  const filteredProjects = projects.filter(project => {
     if (activeTab === 'all') return true;
-    if (activeTab === 'open') return project.status === 'Open';
-    if (activeTab === 'ongoing') return project.status === 'Ongoing';
-    if (activeTab === 'completed') return project.status === 'Completed';
-    return true;
+    return project.status.toLowerCase() === activeTab.toLowerCase();
   });
 
   const handleCancelProject = (projectId) => {
@@ -83,135 +77,132 @@ const MyProjectsScreen = ({ navigation }) => {
       'Cancel Project',
       'Are you sure you want to cancel this project?',
       [
-        {
-          text: 'No',
-          style: 'cancel',
-        },
-        {
-          text: 'Yes',
+        { text: 'No', style: 'cancel' },
+        { 
+          text: 'Yes', 
           onPress: () => {
-            // Update project status to Cancelled
-            const updatedProjects = projects.map((project) =>
-              project.id === projectId ? { ...project, status: 'Cancelled' } : project
+            setProjects(
+              projects.map(project => 
+                project.id === projectId 
+                  ? {...project, status: 'Cancelled'} 
+                  : project
+              )
             );
-            setProjects(updatedProjects);
-          },
-        },
+          } 
+        }
       ]
     );
   };
 
+  const handleMarkComplete = (projectId) => {
+    setProjects(
+      projects.map(project => 
+        project.id === projectId 
+          ? {...project, status: 'Completed'} 
+          : project
+      )
+    );
+  };
+
+  const getStatusColor = (status) => {
+    switch(status.toLowerCase()) {
+      case 'open': return '#4CAF50';
+      case 'ongoing': return '#2196F3';
+      case 'completed': return '#9E9E9E';
+      case 'cancelled': return '#F44336';
+      default: return '#9E9E9E';
+    }
+  };
+
   const renderProjectItem = ({ item }) => (
-    <View style={styles.projectCard}>
-      <View style={styles.projectHeader}>
-        <View>
-          <Text style={styles.projectTitle}>{item.title}</Text>
-          <Text style={styles.projectCategory}>{item.category}</Text>
-        </View>
-        <View style={[
-          styles.statusBadge,
-          item.status === 'Open' && styles.openStatus,
-          item.status === 'Ongoing' && styles.ongoingStatus,
-          item.status === 'Completed' && styles.completedStatus,
-          item.status === 'Cancelled' && styles.cancelledStatus,
-        ]}>
-          <Text style={styles.statusText}>{item.status}</Text>
-        </View>
+    <TouchableOpacity 
+      style={styles.projectCard}
+      onPress={() => navigation.navigate('ProjectDetails', { project: item })}
+    >
+      <View style={styles.cardHeader}>
+        <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(item.status) }]} />
+        <Text style={styles.projectTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.statusText}>{item.status}</Text>
       </View>
-
-      <Text style={styles.projectDescription}>{item.description}</Text>
-
+      
+      <Text style={styles.projectDescription} numberOfLines={2}>{item.description}</Text>
+      
       <View style={styles.projectDetails}>
         <View style={styles.detailItem}>
-          <Ionicons name="calendar" size={16} color={Colors.darkGray} />
+          <Ionicons name="calendar-outline" size={14} color="#777" />
           <Text style={styles.detailText}>{item.date}</Text>
         </View>
+        
         <View style={styles.detailItem}>
-          <Ionicons name="location" size={16} color={Colors.darkGray} />
-          <Text style={styles.detailText}>{item.location}</Text>
-        </View>
-        <View style={styles.detailItem}>
-          <Ionicons name="cash" size={16} color={Colors.darkGray} />
+          <Ionicons name="cash-outline" size={14} color="#777" />
           <Text style={styles.detailText}>RM{item.budget}</Text>
         </View>
       </View>
-
-      {item.status === 'Open' && (
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.editButton]}
-            onPress={() => console.log('Edit project', item.id)}
-          >
-            <Ionicons name="create" size={16} color={Colors.white} />
-            <Text style={styles.actionButtonText}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.cancelButton]}
-            onPress={() => handleCancelProject(item.id)}
-          >
-            <Ionicons name="close-circle" size={16} color={Colors.white} />
-            <Text style={styles.actionButtonText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {item.status === 'Ongoing' && (
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.messageButton]}
-            onPress={() => console.log('Message handyman', item.handyman?.id)}
-          >
-            <Ionicons name="chatbubble" size={16} color={Colors.white} />
-            <Text style={styles.actionButtonText}>Message</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.completeButton]}
-            onPress={() => {
-              const updatedProjects = projects.map((project) =>
-                project.id === item.id ? { ...project, status: 'Completed' } : project
-              );
-              setProjects(updatedProjects);
-            }}
-          >
-            <Ionicons name="checkmark-circle" size={16} color={Colors.white} />
-            <Text style={styles.actionButtonText}>Complete</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {item.status === 'Completed' && (
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
+      
+      <View style={styles.projectFooter}>
+        <Text style={styles.categoryText}>{item.category}</Text>
+        
+        {item.status === 'Open' && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: '#2196F3' }]}
+              onPress={() => navigation.navigate('EditProject', { project: item })}
+            >
+              <Text style={styles.actionButtonText}>Edit</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: '#F44336' }]}
+              onPress={() => handleCancelProject(item.id)}
+            >
+              <Text style={styles.actionButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
+        {item.status === 'Ongoing' && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
+              onPress={() => handleMarkComplete(item.id)}
+            >
+              <Text style={styles.actionButtonText}>Complete</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: '#2196F3' }]}
+              onPress={() => navigation.navigate('Chat', { recipient: item.handyman })}
+            >
+              <Text style={styles.actionButtonText}>Message</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
+        {item.status === 'Completed' && (
+          <TouchableOpacity 
             style={[styles.actionButton, styles.reviewButton]}
-            onPress={() => console.log('Review handyman', item.handyman?.id)}
+            onPress={() => navigation.navigate('LeaveReview', { project: item })}
           >
-            <Ionicons name="star" size={16} color={Colors.white} />
+            <Ionicons name="star-outline" size={16} color="#FFF" />
             <Text style={styles.actionButtonText}>Review</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.rehireButton]}
-            onPress={() => console.log('Rehire handyman', item.handyman?.id)}
-          >
-            <Ionicons name="repeat" size={16} color={Colors.white} />
-            <Text style={styles.actionButtonText}>Rehire</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+        )}
+      </View>
+    </TouchableOpacity>
   );
 
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="construct" size={60} color={Colors.mediumGray} />
+      <Ionicons name="construct-outline" size={64} color="#CCC" />
       <Text style={styles.emptyTitle}>No Projects Found</Text>
       <Text style={styles.emptyText}>
-        You don't have any {activeTab !== 'all' ? activeTab : ''} projects yet.
+        You don't have any {activeTab !== 'all' ? activeTab.toLowerCase() : ''} projects yet
       </Text>
       <TouchableOpacity
-        style={styles.createButton}
+        style={styles.findButton}
         onPress={() => navigation.navigate('HomeTab')}
       >
-        <Text style={styles.createButtonText}>Find a Handyman</Text>
+        <Text style={styles.findButtonText}>Find a Handyman</Text>
       </TouchableOpacity>
     </View>
   );
@@ -219,47 +210,34 @@ const MyProjectsScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'all' && styles.activeTab]}
-          onPress={() => setActiveTab('all')}
-        >
-          <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
-            All
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'open' && styles.activeTab]}
-          onPress={() => setActiveTab('open')}
-        >
-          <Text style={[styles.tabText, activeTab === 'open' && styles.activeTabText]}>
-            Open
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'ongoing' && styles.activeTab]}
-          onPress={() => setActiveTab('ongoing')}
-        >
-          <Text style={[styles.tabText, activeTab === 'ongoing' && styles.activeTabText]}>
-            Ongoing
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'completed' && styles.activeTab]}
-          onPress={() => setActiveTab('completed')}
-        >
-          <Text style={[styles.tabText, activeTab === 'completed' && styles.activeTabText]}>
-            Completed
-          </Text>
-        </TouchableOpacity>
+        {['All', 'Open', 'Ongoing', 'Completed'].map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[
+              styles.tab,
+              activeTab === tab.toLowerCase() && styles.activeTab
+            ]}
+            onPress={() => setActiveTab(tab.toLowerCase())}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === tab.toLowerCase() && styles.activeTabText
+              ]}
+            >
+              {tab}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <FlatList
-  data={filteredProjects}
-  renderItem={renderProjectItem}  // Make sure renderProjectItem destructures { item }
-  keyExtractor={(item) => item.id}
-  contentContainerStyle={styles.listContent}
-  ListEmptyComponent={renderEmptyList}
-/>
+        data={filteredProjects}
+        renderItem={renderProjectItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContainer}
+        ListEmptyComponent={renderEmptyList}
+      />
     </View>
   );
 };
@@ -267,21 +245,17 @@ const MyProjectsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.lightGray,
+    backgroundColor: '#F8F8F8',
   },
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
-    marginBottom: 10,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
   },
   tab: {
     flex: 1,
-    paddingVertical: 15,
+    paddingVertical: 14,
     alignItems: 'center',
   },
   activeTab: {
@@ -290,155 +264,133 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 14,
-    color: Colors.darkGray,
+    color: '#888',
   },
   activeTabText: {
-    fontWeight: 'bold',
     color: Colors.primary,
+    fontWeight: '600',
   },
-  listContent: {
-    padding: 15,
+  listContainer: {
+    padding: 16,
     paddingBottom: 30,
   },
   projectCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    marginBottom: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
     elevation: 2,
   },
-  projectHeader: {
+  cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 10,
   },
+  statusIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
   projectTitle: {
+    flex: 1,
     fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.text,
-  },
-  projectCategory: {
-    fontSize: 14,
-    color: Colors.darkGray,
-    marginTop: 3,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 15,
-    backgroundColor: Colors.mediumGray,
-  },
-  openStatus: {
-    backgroundColor: Colors.accent,
-  },
-  ongoingStatus: {
-    backgroundColor: Colors.primary,
-  },
-  completedStatus: {
-    backgroundColor: Colors.success,
-  },
-  cancelledStatus: {
-    backgroundColor: Colors.error,
+    fontWeight: '600',
+    color: '#333',
   },
   statusText: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: Colors.white,
+    color: '#777',
+    marginLeft: 8,
   },
   projectDescription: {
     fontSize: 14,
-    color: Colors.text,
-    marginBottom: 15,
+    color: '#555',
+    marginBottom: 12,
     lineHeight: 20,
   },
   projectDetails: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: Colors.lightGray,
-    paddingTop: 15,
-    marginBottom: 15,
+    borderTopColor: '#F0F0F0',
+    paddingTop: 12,
+    marginBottom: 12,
   },
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginRight: 24,
   },
   detailText: {
-    fontSize: 12,
-    color: Colors.darkGray,
-    marginLeft: 5,
+    fontSize: 13,
+    color: '#777',
+    marginLeft: 4,
   },
-  actionsContainer: {
+  projectFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  categoryText: {
+    fontSize: 13,
+    color: Colors.primary,
+    backgroundColor: 'rgba(33, 150, 243, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  actionButtons: {
+    flexDirection: 'row',
   },
   actionButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 5,
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    flex: 1,
-    marginHorizontal: 5,
-  },
-  actionButtonText: {
-    color: Colors.white,
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 5,
-  },
-  editButton: {
-    backgroundColor: Colors.primary,
-  },
-  cancelButton: {
-    backgroundColor: Colors.error,
-  },
-  messageButton: {
-    backgroundColor: Colors.primary,
-  },
-  completeButton: {
-    backgroundColor: Colors.success,
   },
   reviewButton: {
-    backgroundColor: Colors.accent,
+    backgroundColor: '#FF9800',
   },
-  rehireButton: {
-    backgroundColor: Colors.primary,
+  actionButtonText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '500',
+    marginLeft: 4,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 30,
+    padding: 32,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
-    marginTop: 15,
-    marginBottom: 5,
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: Colors.darkGray,
+    color: '#777',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
-  createButton: {
+  findButton: {
     backgroundColor: Colors.primary,
-    paddingVertical: 12,
     paddingHorizontal: 20,
-    borderRadius: 10,
+    paddingVertical: 12,
+    borderRadius: 8,
   },
-  createButtonText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
+  findButtonText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
 

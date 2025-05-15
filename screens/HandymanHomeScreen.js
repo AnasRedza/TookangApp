@@ -1,3 +1,5 @@
+// Full HandymanHomeScreen.js Implementation with Navigation
+
 import React, { useState } from 'react';
 import {
   View,
@@ -6,8 +8,8 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  ImageBackground,
-  StatusBar,
+  SafeAreaView,
+  StatusBar
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
@@ -71,196 +73,210 @@ const HandymanHomeScreen = ({ navigation }) => {
   };
 
   const handleAcceptProject = (projectId) => {
-    const updatedProjects = projectRequests.map((project) =>
-      project.id === projectId ? { ...project, status: 'Accepted' } : project
+    setProjectRequests(
+      projectRequests.map((project) =>
+        project.id === projectId ? { ...project, status: 'Accepted' } : project
+      )
     );
-    setProjectRequests(updatedProjects);
   };
 
   const handleDeclineProject = (projectId) => {
-    const updatedProjects = projectRequests.filter(
-      (project) => project.id !== projectId
+    setProjectRequests(
+      projectRequests.filter((project) => project.id !== projectId)
     );
-    setProjectRequests(updatedProjects);
+  };
+
+  const getCategoryIcon = (category) => {
+    switch (category.toLowerCase()) {
+      case 'plumbing':
+        return 'water-outline';
+      case 'electrical':
+        return 'flash-outline';
+      case 'painting':
+        return 'color-palette-outline';
+      case 'carpentry':
+        return 'hammer-outline';
+      case 'landscaping':
+        return 'leaf-outline';
+      default:
+        return 'construct-outline';
+    }
+  };
+
+  // Navigation function to view project details
+  const handleViewProjectDetails = (project) => {
+    navigation.navigate('ProjectDetails', { project });
   };
 
   const renderProjectItem = ({ item }) => (
-    <View style={styles.projectCard}>
-      <View style={styles.projectHeader}>
-        <Text style={styles.projectTitle}>{item.title}</Text>
+    <TouchableOpacity 
+      style={styles.projectCard}
+      onPress={() => handleViewProjectDetails(item)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.cardHeader}>
+        <View style={styles.categoryBadge}>
+          <Ionicons name={getCategoryIcon(item.category)} size={16} color="#FFF" />
+        </View>
+        <Text style={styles.projectTitle} numberOfLines={1}>{item.title}</Text>
+      </View>
+      
+      <View style={styles.clientRow}>
+        <View style={styles.clientInfo}>
+          <Ionicons name="person-outline" size={16} color="#666" />
+          <Text style={styles.clientName}>{item.clientName}</Text>
+        </View>
         <View style={styles.budgetContainer}>
-          <Text style={styles.budgetLabel}>Budget:</Text>
-          <Text style={styles.budget}>RM{item.budget}</Text>
+          <Text style={styles.budgetAmount}>RM{item.budget}</Text>
         </View>
       </View>
-
-      <View style={styles.clientInfo}>
-        <Ionicons name="person" size={16} color={Colors.primary} />
-        <Text style={styles.clientName}>{item.clientName}</Text>
-      </View>
-
-      <Text style={styles.description}>{item.description}</Text>
-
+      
+      <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
+      
       <View style={styles.detailsRow}>
         <View style={styles.detailItem}>
-          <Ionicons name="location" size={16} color={Colors.darkGray} />
+          <Ionicons name="location-outline" size={14} color="#777" />
           <Text style={styles.detailText}>{item.location}</Text>
         </View>
         <View style={styles.detailItem}>
-          <Ionicons name="calendar" size={16} color={Colors.darkGray} />
+          <Ionicons name="calendar-outline" size={14} color="#777" />
           <Text style={styles.detailText}>{item.date}</Text>
         </View>
-        <View style={styles.detailItem}>
-          <Ionicons name="construct" size={16} color={Colors.darkGray} />
-          <Text style={styles.detailText}>{item.category}</Text>
-        </View>
       </View>
-
+      
       {item.status === 'New' && (
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
+        <View style={styles.cardActions}>
+          <TouchableOpacity 
             style={styles.declineButton}
             onPress={() => handleDeclineProject(item.id)}
           >
-            <Ionicons name="close" size={20} color={Colors.error} />
             <Text style={styles.declineButtonText}>Decline</Text>
           </TouchableOpacity>
-          <TouchableOpacity
+          <TouchableOpacity 
             style={styles.acceptButton}
             onPress={() => handleAcceptProject(item.id)}
           >
-            <Ionicons name="checkmark" size={20} color={Colors.white} />
             <Text style={styles.acceptButtonText}>Accept</Text>
           </TouchableOpacity>
         </View>
       )}
-
+      
       {item.status === 'Accepted' && (
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
+        <View style={styles.cardActions}>
+          <TouchableOpacity 
             style={styles.messageButton}
-            onPress={() => console.log('Message client')}
+            onPress={() => navigation.navigate('Chat', { recipient: { name: item.clientName, id: item.id } })}
           >
-            <Ionicons name="chatbubble" size={20} color={Colors.white} />
-            <Text style={styles.buttonText}>Message Client</Text>
+            <Ionicons name="chatbubble-outline" size={16} color="#FFF" />
+            <Text style={styles.messageButtonText}>Message Client</Text>
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 
-  const renderEmptyList = () => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="construct" size={60} color={Colors.mediumGray} />
-      <Text style={styles.emptyTitle}>No Projects Found</Text>
-      <Text style={styles.emptyText}>
-        There are no {activeTab} project requests at the moment.
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Ionicons name="construct-outline" size={64} color="#DDD" />
+      <Text style={styles.emptyStateTitle}>No Projects Found</Text>
+      <Text style={styles.emptyStateMessage}>
+        You don't have any {activeTab} projects at the moment
       </Text>
     </View>
   );
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <ImageBackground
-        source={{ uri: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80' }}
-        style={styles.headerBackground}
-      >
-        <View style={styles.headerOverlay}>
-          <Text style={styles.headerTitle}>TooKang</Text>
-          <Text style={styles.headerSubtitle}>Handyman Dashboard</Text>
-        </View>
-      </ImageBackground>
-
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'new' && styles.activeTab]}
-          onPress={() => setActiveTab('new')}
-        >
-          <Text style={[styles.tabText, activeTab === 'new' && styles.activeTabText]}>
-            New Requests
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'accepted' && styles.activeTab]}
-          onPress={() => setActiveTab('accepted')}
-        >
-          <Text style={[styles.tabText, activeTab === 'accepted' && styles.activeTabText]}>
-            Accepted
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'completed' && styles.activeTab]}
-          onPress={() => setActiveTab('completed')}
-        >
-          <Text style={[styles.tabText, activeTab === 'completed' && styles.activeTabText]}>
-            Completed
-          </Text>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
+      
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>TooKang</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('ProfileTab')}>
+          <View style={styles.profileButton}>
+            <Ionicons name="person-outline" size={22} color={Colors.primary} />
+          </View>
         </TouchableOpacity>
       </View>
-
+      
+      <View style={styles.tabs}>
+        {['New', 'Accepted', 'Completed'].map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[
+              styles.tab,
+              activeTab === tab.toLowerCase() && styles.activeTab
+            ]}
+            onPress={() => setActiveTab(tab.toLowerCase())}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === tab.toLowerCase() && styles.activeTabText
+              ]}
+            >
+              {tab}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      
       <FlatList
         data={filteredRequests}
         renderItem={renderProjectItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        ListEmptyComponent={renderEmptyState}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[Colors.primary]}
+          />
         }
-        ListEmptyComponent={renderEmptyList}
       />
-
-      <TouchableOpacity 
-        style={styles.editProfileButton}
-        onPress={() => navigation.navigate('Profile')}
-      >
-        <Ionicons name="settings" size={24} color={Colors.white} />
-      </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.lightGray,
+    backgroundColor: '#F8F8F8',
   },
-  headerBackground: {
-    height: 150,
-    width: '100%',
-  },
-  headerOverlay: {
-    height: '100%',
-    width: '100%',
-    backgroundColor: 'rgba(52, 152, 219, 0.7)',
-    padding: 20,
-    justifyContent: 'flex-end',
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: Colors.white,
-    marginBottom: 5,
+    color: Colors.primary,
   },
-  headerSubtitle: {
-    fontSize: 16,
-    color: Colors.white,
-    marginBottom: 10,
+  profileButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F0F7FF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  tabsContainer: {
+  tabs: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
-    marginBottom: 10,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#FFF',
+    paddingTop: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
   },
   tab: {
     flex: 1,
-    paddingVertical: 15,
     alignItems: 'center',
+    paddingBottom: 12,
   },
   activeTab: {
     borderBottomWidth: 2,
@@ -268,175 +284,159 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 14,
-    color: Colors.darkGray,
+    color: '#777',
   },
   activeTabText: {
-    fontWeight: 'bold',
     color: Colors.primary,
+    fontWeight: '600',
   },
   listContent: {
-    padding: 15,
+    padding: 16,
     paddingBottom: 30,
   },
   projectCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
     elevation: 2,
   },
-  projectHeader: {
+  cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  categoryBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   projectTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.text,
     flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
   },
-  budgetContainer: {
-    alignItems: 'flex-end',
-  },
-  budgetLabel: {
-    fontSize: 12,
-    color: Colors.darkGray,
-  },
-  budget: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.primary,
+  clientRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   clientInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
   },
   clientName: {
     fontSize: 14,
+    color: '#666',
+    marginLeft: 6,
+  },
+  budgetContainer: {
+    padding: 6,
+    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+    borderRadius: 4,
+  },
+  budgetAmount: {
+    fontSize: 14,
+    fontWeight: '600',
     color: Colors.primary,
-    fontWeight: '500',
-    marginLeft: 5,
   },
   description: {
     fontSize: 14,
-    color: Colors.text,
-    marginBottom: 15,
     lineHeight: 20,
+    color: '#555',
+    marginBottom: 12,
   },
   detailsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: Colors.lightGray,
-    paddingTop: 15,
-    marginBottom: 15,
+    borderTopColor: '#F0F0F0',
+    paddingTop: 12,
+    marginBottom: 12,
   },
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginRight: 16,
   },
   detailText: {
-    fontSize: 12,
-    color: Colors.darkGray,
-    marginLeft: 5,
+    fontSize: 13,
+    color: '#777',
+    marginLeft: 4,
   },
-  actionsContainer: {
+  cardActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   declineButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.error,
-    borderRadius: 5,
-    paddingVertical: 8,
-    paddingHorizontal: 15,
     flex: 1,
-    marginRight: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E53935',
+    borderRadius: 6,
+    marginRight: 8,
   },
   declineButtonText: {
-    color: Colors.error,
+    color: '#E53935',
     fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 5,
+    fontWeight: '500',
   },
   acceptButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.success,
-    borderRadius: 5,
-    paddingVertical: 8,
-    paddingHorizontal: 15,
     flex: 1,
-    marginLeft: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    borderRadius: 6,
+    marginLeft: 8,
   },
   acceptButtonText: {
-    color: Colors.white,
+    color: '#FFF',
     fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 5,
+    fontWeight: '500',
   },
   messageButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.primary,
-    borderRadius: 5,
-    paddingVertical: 8,
-    paddingHorizontal: 15,
     flex: 1,
+    paddingVertical: 8,
+    backgroundColor: Colors.primary,
+    borderRadius: 6,
   },
-  buttonText: {
-    color: Colors.white,
+  messageButtonText: {
+    color: '#FFF',
     fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 5,
+    fontWeight: '500',
+    marginLeft: 8,
   },
-  emptyContainer: {
+  emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 30,
-    marginTop: 20,
+    padding: 32,
+    marginTop: 32,
   },
-  emptyTitle: {
+  emptyStateTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
-    marginTop: 15,
-    marginBottom: 5,
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
   },
-  emptyText: {
+  emptyStateMessage: {
     fontSize: 14,
-    color: Colors.darkGray,
+    color: '#777',
     textAlign: 'center',
-    marginBottom: 20,
-  },
-  editProfileButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    backgroundColor: Colors.primary,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
+  }
 });
 
 export default HandymanHomeScreen;
