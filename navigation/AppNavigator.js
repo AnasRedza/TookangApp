@@ -1,769 +1,454 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  ScrollView,
-  SafeAreaView,
-  StatusBar,
-  Platform,
-  ActivityIndicator
-} from 'react-native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import React, { Alert } from 'react';
+import { View, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import Colors from '../constants/Colors';
 
-// Import screens for Customer side
+// Auth Screens
+import LoginScreen from '../screens/LoginScreen';
+import RegisterScreen from '../screens/RegisterScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
+
+// Home Stack Screens
 import HomeScreen from '../screens/HomeScreen';
 import HandymanDetailScreen from '../screens/HandymanDetailScreen';
 import ProjectBidScreen from '../screens/ProjectBidScreen';
-import MyProjectsScreen from '../screens/MyProjectsScreen';
-import ProfileScreen from '../screens/ProfileScreen';
-import EditProfileScreen from '../screens/EditProfileScreen';
-import ChatListScreen from '../screens/ChatListScreen';
-import ChatScreen from '../screens/ChatScreen';
+import ServiceCategoryScreen from '../screens/ServiceCategoryScreen';
+import SearchResultsScreen from '../screens/SearchResultsScreen';
 
-// Import payment screens
+// Projects Stack Screens
+import MyProjectsScreen from '../screens/MyProjectsScreen';
+import ProjectDetailScreen from '../screens/ProjectDetailScreen';
+import ProjectOfferScreen from '../screens/ProjectOfferScreen';
+import BudgetAdjustmentScreen from '../screens/BudgetAdjustmentScreen';
+import AdjustmentApprovalScreen from '../screens/AdjustmentApprovalScreen';
+
+// Payment Screens
 import PaymentScreen from '../screens/PaymentScreen';
 import PaymentSuccessScreen from '../screens/PaymentSuccessScreen';
 import PaymentMethodsScreen from '../screens/PaymentMethodsScreen';
 import TransactionHistoryScreen from '../screens/TransactionHistoryScreen';
-import AdjustmentApprovalScreen from '../screens/AdjustmentApprovalScreen';
 
-// Import screens for Handyman side
-import HandymanHomeScreen from '../screens/HandymanHomeScreen';
-import ProjectDetailScreen from '../screens/ProjectDetailScreen';
-import ProjectOfferScreen from '../screens/ProjectOfferScreen';
-import BudgetAdjustmentScreen from '../screens/BudgetAdjustmentScreen';
-import EarningsScreen from '../screens/EarningsScreen';
-import WithdrawalScreen from '../screens/WithdrawalScreen';
+// Chat Stack Screens
+import ChatListScreen from '../screens/ChatListScreen';
+import ChatScreen from '../screens/ChatScreen';
 
-// Import settings screens
+// Profile Stack Screens
+import ProfileScreen from '../screens/ProfileScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
+
+// Additional Screens
+import HelpScreen from '../screens/HelpScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-import LanguageSettingsScreen from '../screens/LanguageSettingsScreen';
-import ChangePasswordScreen from '../screens/ChangePasswordScreen';
-import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
-import HelpCenterScreen from '../screens/HelpCenterScreen';
-import ContactSupportScreen from '../screens/ContactSupportScreen';
-
-// Import auth screens
-import LoginScreen from '../screens/LoginScreen';
-import RegisterScreen from '../screens/RegisterScreen';
-import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
-
-// Define DrawerContent component with proper status bar handling
-const DrawerContent = ({ navigation }) => {
-  const { userType, logout } = useAuth();
-  
-  // Sample user profile data
-  const user = {
-    name: 'John Smith',
-    email: 'john.smith@example.com',
-    avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-    rating: userType === 'handyman' ? 4.8 : null,
-  };
-
-  // Navigation helper functions
-  const navigateToTab = (tabName) => {
-    navigation.navigate(userType === 'handyman' ? 'HandymanTabs' : 'CustomerTabs', {
-      screen: tabName
-    });
-    navigation.closeDrawer();
-  };
-
-  const navigateToNestedScreen = (tabName, screenName, params = {}) => {
-    navigation.navigate(userType === 'handyman' ? 'HandymanTabs' : 'CustomerTabs', {
-      screen: tabName,
-      params: {
-        screen: screenName,
-        params: params
-      }
-    });
-    navigation.closeDrawer();
-  };
-
-  return (
-    <View style={styles.drawerContainer}>
-      {/* Status bar handling */}
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
-      {/* Safe area view for proper status bar handling */}
-      <SafeAreaView style={styles.safeAreaTop} />
-      
-      <SafeAreaView style={styles.safeAreaContent}>
-        <View style={styles.userInfoSection}>
-          <Image source={{ uri: user.avatar }} style={styles.avatar} />
-          <View style={styles.userDetails}>
-            <Text style={styles.userName}>{user.name}</Text>
-            <Text style={styles.userEmail}>{user.email}</Text>
-            {userType === 'handyman' && (
-              <View style={styles.ratingContainer}>
-                <Ionicons name="star" size={16} color="#FFC107" />
-                <Text style={styles.ratingText}>{user.rating}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-        
-        <ScrollView style={styles.menuSection}>
-          {/* Dashboard/Home */}
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => navigateToTab(userType === 'handyman' ? 'Dashboard' : 'HomeTab')}
-          >
-            <Ionicons name="home-outline" size={22} color="#555" />
-            <Text style={styles.menuItemText}>{userType === 'handyman' ? 'Dashboard' : 'Home'}</Text>
-          </TouchableOpacity>
-          
-          {/* My Projects */}
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => navigateToTab('MyProjects')}
-          >
-            <Ionicons name={userType === 'handyman' ? 'construct-outline' : 'briefcase-outline'} size={22} color="#555" />
-            <Text style={styles.menuItemText}>My Projects</Text>
-          </TouchableOpacity>
-          
-          {/* Messages */}
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => navigateToTab('ChatTab')}
-          >
-            <Ionicons name="chatbubbles-outline" size={22} color="#555" />
-            <Text style={styles.menuItemText}>Messages</Text>
-          </TouchableOpacity>
-          
-          {/* Payment/Earnings */}
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => {
-              if (userType === 'handyman') {
-                navigateToTab('EarningsTab');
-              } else {
-                navigateToNestedScreen('ProfileTab', 'PaymentMethods');
-              }
-            }}
-          >
-            <Ionicons name={userType === 'handyman' ? 'wallet-outline' : 'card-outline'} size={22} color="#555" />
-            <Text style={styles.menuItemText}>{userType === 'handyman' ? 'Earnings' : 'Payment Methods'}</Text>
-          </TouchableOpacity>
-          
-          {/* Transaction History */}
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => navigateToNestedScreen('ProfileTab', 'TransactionHistory')}
-          >
-            <Ionicons name="receipt-outline" size={22} color="#555" />
-            <Text style={styles.menuItemText}>Transaction History</Text>
-          </TouchableOpacity>
-          
-          {/* Profile */}
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => navigateToTab('ProfileTab')}
-          >
-            <Ionicons name="person-outline" size={22} color="#555" />
-            <Text style={styles.menuItemText}>Profile</Text>
-          </TouchableOpacity>
-          
-          {/* Settings */}
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => navigateToNestedScreen('ProfileTab', 'Settings')}
-          >
-            <Ionicons name="settings-outline" size={22} color="#555" />
-            <Text style={styles.menuItemText}>Settings</Text>
-          </TouchableOpacity>
-          
-          {/* Help & Support */}
-          <TouchableOpacity 
-            style={styles.menuItem}
-            onPress={() => navigateToNestedScreen('ProfileTab', 'HelpCenter')}
-          >
-            <Ionicons name="help-circle-outline" size={22} color="#555" />
-            <Text style={styles.menuItemText}>Help & Support</Text>
-          </TouchableOpacity>
-        </ScrollView>
-        
-        <View style={styles.bottomSection}>
-          <TouchableOpacity 
-            style={[styles.menuItem, styles.logoutItem]}
-            onPress={() => {
-              logout();
-              navigation.closeDrawer();
-            }}
-          >
-            <Ionicons name="log-out-outline" size={22} color="#E53935" />
-            <Text style={[styles.menuItemText, styles.logoutText]}>Logout</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    </View>
-  );
-};
+import AboutScreen from '../screens/AboutScreen';
+import HelpTopicScreen from '../screens/HelpTopicScreen';
 
 // Create navigators
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const Drawer = createDrawerNavigator();
 
-// Common header options to include the menu button on all stack screens
-const getStackScreenOptions = (navigation) => ({
-  headerStyle: {
-    backgroundColor: Colors.primary,
-  },
-  headerTintColor: Colors.white,
-  headerTitleStyle: {
-    fontWeight: 'bold',
-  },
-  headerLeft: () => (
-    <Ionicons
-      name="menu"
-      size={25}
-      color={Colors.white}
-      style={{ marginLeft: 15 }}
-      onPress={() => navigation.openDrawer()}
-    />
-  ),
+// Menu button component
+const MenuButton = ({ navigation }) => (
+  <TouchableOpacity 
+    style={{ marginLeft: 15 }}
+    onPress={() => navigation.openDrawer()}
+  >
+    <Ionicons name="menu" size={24} color="#FFFFFF" />
+  </TouchableOpacity>
+);
+
+// Back button with drawer option
+const BackButtonWithDrawer = ({ navigation, canGoBack }) => {
+  if (canGoBack) {
+    return (
+      <TouchableOpacity 
+        style={{ marginLeft: 15 }}
+        onPress={() => navigation.goBack()}
+      >
+        <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+      </TouchableOpacity>
+    );
+  } else {
+    return <MenuButton navigation={navigation} />;
+  }
+};
+
+// Common header options with drawer menu
+const getScreenOptions = (navigation) => ({
+  headerStyle: { backgroundColor: Colors.primary },
+  headerTintColor: '#FFFFFF',
+  headerTitleStyle: { fontWeight: 'bold' },
+  headerLeft: () => <MenuButton navigation={navigation} />
 });
 
-// Authentication stack navigator
-function AuthStack() {
+// Authentication Stack Navigator
+const AuthStack = () => {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
-      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+    <Stack.Navigator screenOptions={screenOptionsBase} initialRouteName="Onboarding">
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Sign In' }} />
+      <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Create Account' }} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Reset Password' }} />
     </Stack.Navigator>
   );
-}
+};
 
-// Chat stack navigator for both user types
-function ChatStack({ navigation }) {
+// Base screen options without menu button
+const screenOptionsBase = {
+  headerStyle: { backgroundColor: Colors.primary },
+  headerTintColor: '#FFFFFF',
+  headerTitleStyle: { fontWeight: 'bold' }
+};
+
+// Home Stack Navigator
+const HomeStack = () => {
   return (
-    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
-      <Stack.Screen 
-        name="ChatList" 
-        component={ChatListScreen} 
-        options={{ title: 'Messages' }} 
-      />
-      <Stack.Screen 
-        name="Chat" 
-        component={ChatScreen} 
-        options={({ route }) => ({ 
-          title: route.params?.recipient?.name || '' 
-        })} 
-      />
+    <Stack.Navigator 
+      initialRouteName="Home"
+      screenOptions={({ navigation, route }) => ({
+        ...screenOptionsBase,
+        headerLeft: () => {
+          const isFirstRouteInParent = route.name === 'Home';
+          return isFirstRouteInParent 
+            ? <MenuButton navigation={navigation} />
+            : <BackButtonWithDrawer navigation={navigation} canGoBack={true} />;
+        }
+      })}
+    >
+      <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'TooKang' }} />
+      <Stack.Screen name="HandymanDetail" component={HandymanDetailScreen} options={{ title: 'Handyman Profile' }} />
+      <Stack.Screen name="ProjectBid" component={ProjectBidScreen} options={{ title: 'Create Project' }} />
+      <Stack.Screen name="ServiceCategory" component={ServiceCategoryScreen} 
+        options={({ route }) => ({ title: route.params?.category || 'Category' })} />
+      <Stack.Screen name="SearchResults" component={SearchResultsScreen} options={{ title: 'Search Results' }} />
+      <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment' }} />
+      <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} 
+        options={{ title: 'Payment Complete', headerLeft: () => null }} />
+      <Stack.Screen name="AdjustmentApproval" component={AdjustmentApprovalScreen} options={{ title: 'Budget Adjustment' }} />
     </Stack.Navigator>
   );
-}
+};
 
-// Settings stack navigator
-function SettingsStack({ navigation }) {
+// Projects Stack Navigator
+const ProjectsStack = () => {
   return (
-    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
-      <Stack.Screen 
-        name="SettingsMain" 
-        component={SettingsScreen} 
-        options={{ title: 'Settings' }} 
-      />
-      <Stack.Screen 
-        name="LanguageSettings" 
-        component={LanguageSettingsScreen} 
-        options={{ title: 'Language' }} 
-      />
-      <Stack.Screen 
-        name="ChangePassword" 
-        component={ChangePasswordScreen} 
-        options={{ title: 'Change Password' }} 
-      />
-      <Stack.Screen 
-        name="PrivacyPolicy" 
-        component={PrivacyPolicyScreen} 
-        options={{ title: 'Privacy Policy' }} 
-      />
-      <Stack.Screen 
-        name="HelpCenter" 
-        component={HelpCenterScreen} 
-        options={{ title: 'Help Center' }} 
-      />
-      <Stack.Screen 
-        name="ContactSupport" 
-        component={ContactSupportScreen} 
-        options={{ title: 'Contact Support' }} 
-      />
+    <Stack.Navigator 
+      initialRouteName="MyProjects"
+      screenOptions={({ navigation, route }) => ({
+        ...screenOptionsBase,
+        headerLeft: () => {
+          const isFirstRouteInParent = route.name === 'MyProjects';
+          return isFirstRouteInParent 
+            ? <MenuButton navigation={navigation} />
+            : <BackButtonWithDrawer navigation={navigation} canGoBack={true} />;
+        }
+      })}
+    >
+      <Stack.Screen name="MyProjects" component={MyProjectsScreen} options={{ title: 'My Projects' }} />
+      <Stack.Screen name="ProjectDetails" component={ProjectDetailScreen} options={{ title: 'Project Details' }} />
+      <Stack.Screen name="ProjectOffer" component={ProjectOfferScreen} options={{ title: 'Make an Offer' }} />
+      <Stack.Screen name="BudgetAdjustment" component={BudgetAdjustmentScreen} options={{ title: 'Adjust Budget' }} />
+      <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment' }} />
+      <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} 
+        options={{ title: 'Payment Complete', headerLeft: () => null }} />
+      <Stack.Screen name="AdjustmentApproval" component={AdjustmentApprovalScreen} options={{ title: 'Budget Adjustment' }} />
     </Stack.Navigator>
   );
-}
+};
 
-// Payment stack navigator for customer
-function PaymentStack({ navigation }) {
+// Chat Stack Navigator
+const ChatStack = () => {
   return (
-    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
-      <Stack.Screen 
-        name="PaymentMethods" 
-        component={PaymentMethodsScreen} 
-        options={{ title: 'Payment Methods' }} 
-      />
-      <Stack.Screen 
-        name="Payment" 
-        component={PaymentScreen} 
-        options={{ title: 'Make Payment' }} 
-      />
-      <Stack.Screen 
-        name="PaymentSuccess" 
-        component={PaymentSuccessScreen} 
-        options={{ title: 'Payment Complete', headerLeft: null }} 
-      />
-      <Stack.Screen 
-        name="TransactionHistory" 
-        component={TransactionHistoryScreen} 
-        options={{ title: 'Transaction History' }} 
-      />
+    <Stack.Navigator 
+      initialRouteName="Chats"
+      screenOptions={({ navigation, route }) => ({
+        ...screenOptionsBase,
+        headerLeft: () => {
+          const isFirstRouteInParent = route.name === 'Chats';
+          return isFirstRouteInParent 
+            ? <MenuButton navigation={navigation} />
+            : <BackButtonWithDrawer navigation={navigation} canGoBack={true} />;
+        }
+      })}
+    >
+      <Stack.Screen name="Chats" component={ChatListScreen} options={{ title: 'Messages' }} />
+      <Stack.Screen name="Chat" component={ChatScreen} 
+        options={({ route }) => ({ title: route.params?.recipient?.name || 'Chat' })} />
     </Stack.Navigator>
   );
-}
+};
 
-// Earnings stack navigator for handyman
-function EarningsStack({ navigation }) {
+// Profile Stack Navigator
+const ProfileStack = () => {
   return (
-    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
-      <Stack.Screen 
-        name="EarningsMain" 
-        component={EarningsScreen} 
-        options={{ title: 'Earnings' }} 
-      />
-      <Stack.Screen 
-        name="Withdrawal" 
-        component={WithdrawalScreen} 
-        options={{ title: 'Withdraw Funds' }} 
-      />
-      <Stack.Screen 
-        name="TransactionHistory" 
-        component={TransactionHistoryScreen} 
-        options={{ title: 'Transaction History' }} 
-      />
+    <Stack.Navigator 
+      initialRouteName="Profile"
+      screenOptions={({ navigation, route }) => ({
+        ...screenOptionsBase,
+        headerLeft: () => {
+          const isFirstRouteInParent = route.name === 'Profile';
+          return isFirstRouteInParent 
+            ? <MenuButton navigation={navigation} />
+            : <BackButtonWithDrawer navigation={navigation} canGoBack={true} />;
+        }
+      })}
+    >
+      <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'My Profile' }} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit Profile' }} />
+      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ title: 'Notification Settings' }} />
     </Stack.Navigator>
   );
-}
+};
 
-// Profile stack navigator for both user types
-function ProfileStack({ navigation }) {
+// Help Stack Navigator
+const HelpStack = () => {
   return (
-    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
-      <Stack.Screen 
-        name="ProfileMain" 
-        component={ProfileScreen} 
-        options={{ title: 'Profile' }} 
-      />
-      <Stack.Screen 
-        name="EditProfile" 
-        component={EditProfileScreen} 
-        options={{ title: 'Edit Profile' }} 
-      />
-      <Stack.Screen 
-        name="Settings" 
-        component={SettingsStack} 
-        options={{ headerShown: false }} 
-      />
-      <Stack.Screen 
-        name="PaymentMethods" 
-        component={PaymentStack} 
-        options={{ headerShown: false }} 
-      />
-      <Stack.Screen 
-        name="TransactionHistory" 
-        component={TransactionHistoryScreen} 
-        options={{ title: 'Transaction History' }} 
-      />
+    <Stack.Navigator 
+      initialRouteName="Help"
+      screenOptions={({ navigation, route }) => ({
+        ...screenOptionsBase,
+        headerLeft: () => {
+          const isFirstRouteInParent = route.name === 'Help';
+          return isFirstRouteInParent 
+            ? <MenuButton navigation={navigation} />
+            : <BackButtonWithDrawer navigation={navigation} canGoBack={true} />;
+        }
+      })}
+    >
+      <Stack.Screen name="Help" component={HelpScreen} options={{ title: 'Help & Support' }} />
+      <Stack.Screen name="HelpTopic" component={HelpTopicScreen}
+        options={({ route }) => ({ title: route.params?.topic?.title || 'Help Topic' })} />
     </Stack.Navigator>
   );
-}
+};
 
-// Customer's home stack navigator
-function HomeStack({ navigation }) {
+// Settings Stack Navigator
+const SettingsStack = () => {
   return (
-    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
-      <Stack.Screen 
-        name="Home" 
-        component={HomeScreen} 
-        options={{ title: 'TooKang' }}
-      />
-      <Stack.Screen 
-        name="HandymanDetail" 
-        component={HandymanDetailScreen} 
-        options={{ title: 'Handyman Profile' }} 
-      />
-      <Stack.Screen 
-        name="ProjectBid" 
-        component={ProjectBidScreen} 
-        options={{ title: 'Create Project' }} 
-      />
-      <Stack.Screen 
-        name="Payment" 
-        component={PaymentScreen} 
-        options={{ title: 'Payment' }} 
-      />
-      <Stack.Screen 
-        name="PaymentSuccess" 
-        component={PaymentSuccessScreen} 
-        options={{ title: 'Payment Complete', headerLeft: null }} 
-      />
-      <Stack.Screen 
-        name="AdjustmentApproval" 
-        component={AdjustmentApprovalScreen} 
-        options={{ title: 'Budget Adjustment' }} 
-      />
+    <Stack.Navigator 
+      initialRouteName="Settings"
+      screenOptions={({ navigation, route }) => ({
+        ...screenOptionsBase,
+        headerLeft: () => {
+          const isFirstRouteInParent = route.name === 'Settings';
+          return isFirstRouteInParent 
+            ? <MenuButton navigation={navigation} />
+            : <BackButtonWithDrawer navigation={navigation} canGoBack={true} />;
+        }
+      })}
+    >
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
+      <Stack.Screen name="SettingsNotifications" component={NotificationSettingsScreen} 
+        options={{ title: 'Notification Settings' }} />
     </Stack.Navigator>
   );
-}
+};
 
-// Handyman stack navigator
-function HandymanStack({ navigation }) {
+// Payment Methods Stack Navigator
+const PaymentMethodsStack = () => {
   return (
-    <Stack.Navigator screenOptions={() => getStackScreenOptions(navigation)}>
-      <Stack.Screen 
-        name="HandymanDashboard" 
-        component={HandymanHomeScreen} 
-        options={{ title: 'Dashboard' }}
-      />
-      <Stack.Screen 
-        name="ProjectDetails" 
-        component={ProjectDetailScreen} 
-        options={{ title: 'Project Details' }} 
-      />
-      <Stack.Screen 
-        name="ProjectOffer" 
-        component={ProjectOfferScreen} 
-        options={{ title: 'Make an Offer' }} 
-      />
-      <Stack.Screen 
-        name="BudgetAdjustment" 
-        component={BudgetAdjustmentScreen} 
-        options={{ title: 'Adjust Budget' }} 
-      />
+    <Stack.Navigator 
+      initialRouteName="PaymentMethods"
+      screenOptions={({ navigation }) => ({
+        ...screenOptionsBase,
+        headerLeft: () => <MenuButton navigation={navigation} />
+      })}
+    >
+      <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} options={{ title: 'Payment Methods' }} />
     </Stack.Navigator>
   );
-}
+};
 
-// Customer's bottom tab navigator
-function CustomerTabs() {
+// Transaction History Stack Navigator
+const TransactionHistoryStack = () => {
+  return (
+    <Stack.Navigator 
+      initialRouteName="TransactionHistory"
+      screenOptions={({ navigation }) => ({
+        ...screenOptionsBase,
+        headerLeft: () => <MenuButton navigation={navigation} />
+      })}
+    >
+      <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} options={{ title: 'Transaction History' }} />
+    </Stack.Navigator>
+  );
+};
+
+// About Stack Navigator
+const AboutStack = () => {
+  return (
+    <Stack.Navigator 
+      initialRouteName="About"
+      screenOptions={({ navigation }) => ({
+        ...screenOptionsBase,
+        headerLeft: () => <MenuButton navigation={navigation} />
+      })}
+    >
+      <Stack.Screen name="About" component={AboutScreen} options={{ title: 'About Us' }} />
+    </Stack.Navigator>
+  );
+};
+
+// Main Tab Navigator
+const MainTabs = () => {
   return (
     <Tab.Navigator
+      initialRouteName="HomeTab"
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
-
-          if (route.name === 'HomeTab') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'MyProjects') {
-            iconName = focused ? 'briefcase' : 'briefcase-outline';
-          } else if (route.name === 'ChatTab') {
-            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
-          } else if (route.name === 'ProfileTab') {
-            iconName = focused ? 'person' : 'person-outline';
-          }
-
+          if (route.name === 'HomeTab') iconName = focused ? 'home' : 'home-outline';
+          else if (route.name === 'ProjectsTab') iconName = focused ? 'list' : 'list-outline';
+          else if (route.name === 'ChatTab') iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
+          else if (route.name === 'ProfileTab') iconName = focused ? 'person' : 'person-outline';
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: 'gray',
+        headerShown: false
       })}
     >
-      <Tab.Screen 
-        name="HomeTab" 
-        component={HomeStack} 
-        options={{ 
-          headerShown: false,
-          title: 'Home'
-        }} 
-      />
-      <Tab.Screen 
-        name="MyProjects" 
-        component={MyProjectsScreen} 
-        options={({ navigation }) => ({
-          title: 'My Projects',
-          headerStyle: {
-            backgroundColor: Colors.primary,
-          },
-          headerTintColor: Colors.white,
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-          headerLeft: () => (
-            <Ionicons
-              name="menu"
-              size={25}
-              color={Colors.white}
-              style={{ marginLeft: 15 }}
-              onPress={() => navigation.openDrawer()}
-            />
-          ),
-        })} 
-      />
-      <Tab.Screen 
-        name="ChatTab" 
-        component={ChatStack} 
-        options={{ 
-          headerShown: false,
-          title: 'Messages'
-        }} 
-      />
-      <Tab.Screen 
-        name="ProfileTab" 
-        component={ProfileStack} 
-        options={{ 
-          headerShown: false,
-          title: 'Profile'
-        }} 
-      />
+      <Tab.Screen name="HomeTab" component={HomeStack} options={{ title: 'Home' }} />
+      <Tab.Screen name="ProjectsTab" component={ProjectsStack} options={{ title: 'Projects' }} />
+      <Tab.Screen name="ChatTab" component={ChatStack} options={{ title: 'Messages' }} />
+      <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );
-}
+};
 
-// Handyman's bottom tab navigator
-function HandymanTabs() {
-  return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-
-          if (route.name === 'Dashboard') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'MyProjects') {
-            iconName = focused ? 'construct' : 'construct-outline';
-          } else if (route.name === 'ChatTab') {
-            iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
-          } else if (route.name === 'EarningsTab') {
-            iconName = focused ? 'wallet' : 'wallet-outline';
-          } else if (route.name === 'ProfileTab') {
-            iconName = focused ? 'person' : 'person-outline';
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: 'gray',
-      })}
-    >
-      <Tab.Screen 
-        name="Dashboard" 
-        component={HandymanStack} 
-        options={{ 
-          headerShown: false,
-          title: 'Dashboard'
-        }} 
-      />
-      <Tab.Screen 
-        name="MyProjects" 
-        component={MyProjectsScreen} 
-        options={({ navigation }) => ({
-          title: 'My Projects',
-          headerStyle: {
-            backgroundColor: Colors.primary,
-          },
-          headerTintColor: Colors.white,
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-          headerLeft: () => (
-            <Ionicons
-              name="menu"
-              size={25}
-              color={Colors.white}
-              style={{ marginLeft: 15 }}
-              onPress={() => navigation.openDrawer()}
-            />
-          ),
-        })} 
-      />
-      <Tab.Screen 
-        name="ChatTab" 
-        component={ChatStack} 
-        options={{ 
-          headerShown: false,
-          title: 'Messages'
-        }} 
-      />
-      <Tab.Screen 
-        name="EarningsTab" 
-        component={EarningsStack} 
-        options={{ 
-          headerShown: false,
-          title: 'Earnings'
-        }} 
-      />
-      <Tab.Screen 
-        name="ProfileTab" 
-        component={ProfileStack} 
-        options={{ 
-          headerShown: false,
-          title: 'Profile'
-        }} 
-      />
-    </Tab.Navigator>
-  );
-}
-
-// Customer drawer navigation with gesture enabled
-function CustomerDrawer() {
-  return (
-    <Drawer.Navigator
-      drawerContent={(props) => <DrawerContent {...props} />}
-      screenOptions={{
-        headerShown: false,
-        drawerStyle: {
-          width: '75%',
-        },
-        gestureEnabled: true,  // Enable gesture to open drawer on all screens
-      }}
-    >
-      <Drawer.Screen name="CustomerTabs" component={CustomerTabs} />
-    </Drawer.Navigator>
-  );
-}
-
-// Handyman drawer navigation with gesture enabled
-function HandymanDrawer() {
-  return (
-    <Drawer.Navigator
-      drawerContent={(props) => <DrawerContent {...props} />}
-      screenOptions={{
-        headerShown: false,
-        drawerStyle: {
-          width: '75%',
-        },
-        gestureEnabled: true,  // Enable gesture to open drawer on all screens
-      }}
-    >
-      <Drawer.Screen name="HandymanTabs" component={HandymanTabs} />
-    </Drawer.Navigator>
-  );
-}
-
-// Root navigator with Auth context
-const AppNavigator = () => {
-  // Get authentication state from context
-  const { isLoading, userToken, userType } = useAuth();
+// Main Drawer Navigator
+const MainDrawer = () => {
+  const { logout } = useAuth();
   
-  // Show loading indicator while checking authentication state
+  return (
+    <Drawer.Navigator
+      initialRouteName="MainTabs"
+      screenOptions={{
+        headerShown: false,
+        drawerActiveTintColor: Colors.primary,
+        drawerInactiveTintColor: '#666'
+      }}
+    >
+      <Drawer.Screen 
+        name="MainTabs" 
+        component={MainTabs} 
+        options={{
+          title: 'TooKang',
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="home" color={color} size={size} />
+          )
+        }}
+      />
+      <Drawer.Screen 
+        name="PaymentMethodsDrawer" 
+        component={PaymentMethodsStack} 
+        options={{
+          title: 'Payment Methods',
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="card" color={color} size={size} />
+          )
+        }}
+      />
+      <Drawer.Screen 
+        name="TransactionHistoryDrawer" 
+        component={TransactionHistoryStack}
+        options={{
+          title: 'Transaction History',
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="receipt" color={color} size={size} />
+          )
+        }}
+      />
+      <Drawer.Screen 
+        name="HelpDrawer" 
+        component={HelpStack}
+        options={{
+          title: 'Help & Support',
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="help-circle" color={color} size={size} />
+          )
+        }}
+      />
+      <Drawer.Screen 
+        name="SettingsDrawer" 
+        component={SettingsStack}
+        options={{
+          title: 'Settings',
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="settings" color={color} size={size} />
+          )
+        }}
+      />
+      <Drawer.Screen 
+        name="AboutDrawer" 
+        component={AboutStack}
+        options={{
+          title: 'About Us',
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="information-circle" color={color} size={size} />
+          )
+        }}
+      />
+      <Drawer.Screen 
+        name="Logout" 
+        component={EmptyComponent}
+        options={{
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="log-out" color={color} size={size} />
+          )
+        }}
+        listeners={({ navigation }) => ({
+          onPress: () => {
+            // Close drawer
+            navigation.closeDrawer();
+            // Show confirmation dialog
+            Alert.alert(
+              'Logout',
+              'Are you sure you want to logout?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                  text: 'Logout', 
+                  style: 'destructive',
+                  onPress: logout
+                }
+              ]
+            );
+          }
+        })}
+      />
+    </Drawer.Navigator>
+  );
+};
+
+// Empty component for logout option
+const EmptyComponent = () => <View />;
+
+// App Navigator
+const AppNavigator = () => {
+  const { user, isLoading } = useAuth();
+  
+  // Show a loading screen while checking authentication
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
   }
   
-  // Return the appropriate navigator based on authentication state
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {userToken === null ? (
-        // User is not logged in
-        <Stack.Screen name="Auth" component={AuthStack} />
-      ) : userType === 'customer' ? (
-        // User logged in as customer
-        <Stack.Screen name="CustomerRoot" component={CustomerDrawer} />
-      ) : (
-        // User logged in as handyman
-        <Stack.Screen name="HandymanRoot" component={HandymanDrawer} />
-      )}
-    </Stack.Navigator>
+    <NavigationContainer>
+      {user ? <MainDrawer /> : <AuthStack />}
+    </NavigationContainer>
   );
 };
-
-// Styles
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  drawerContainer: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  safeAreaTop: {
-    backgroundColor: '#FFFFFF',
-    // On Android we need to ensure the drawer doesn't overlap the status bar
-    ...Platform.select({
-      android: {
-        height: StatusBar.currentHeight,
-      },
-    }),
-  },
-  safeAreaContent: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  userInfoSection: {
-    flexDirection: 'row',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    alignItems: 'center',
-  },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 16,
-  },
-  userDetails: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#777',
-    marginTop: 2,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  ratingText: {
-    fontSize: 14,
-    color: '#555',
-    marginLeft: 4,
-  },
-  menuSection: {
-    flex: 1,
-    paddingTop: 8,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  menuItemText: {
-    fontSize: 15,
-    color: '#333',
-    marginLeft: 16,
-  },
-  bottomSection: {
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    paddingVertical: 8,
-  },
-  logoutItem: {
-    marginTop: 4,
-  },
-  logoutText: {
-    color: '#E53935',
-  }
-});
 
 export default AppNavigator;

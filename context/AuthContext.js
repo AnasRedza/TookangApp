@@ -1,83 +1,100 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Create context
+// Create the AuthContext
 const AuthContext = createContext();
 
-// Create provider component
+// AuthProvider component
 export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [userToken, setUserToken] = useState(null);
-  const [userType, setUserType] = useState(null); // 'customer' or 'handyman'
 
-  // Check if user is logged in on app start
+  // Check for stored user on app load
   useEffect(() => {
-    // Load user data from AsyncStorage
-    const bootstrapAsync = async () => {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        const type = await AsyncStorage.getItem('userType');
-        
-        // Set state based on stored values
-        setUserToken(token);
-        setUserType(type);
-      } catch (e) {
-        console.log('Failed to load user data', e);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    bootstrapAsync();
+    checkUserLoggedIn();
   }, []);
 
-  // Login function
-  const login = async (type, token = 'dummy-token') => {
+  // Function to check if user is logged in
+  const checkUserLoggedIn = async () => {
     try {
-      // Save user data to AsyncStorage
-      await AsyncStorage.setItem('userToken', token);
-      await AsyncStorage.setItem('userType', type);
+      const storedUser = await AsyncStorage.getItem('user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+    } catch (error) {
+      console.log('Error checking for user:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Login function
+  const login = async (email, password) => {
+    try {
+      // Here you'd typically make an API call to your backend
+      // For now, we'll simulate a successful login
+      const userDetails = { id: '1', email, userType: 'customer', name: 'Test User' };
+      
+      // Store user details in AsyncStorage
+      await AsyncStorage.setItem('user', JSON.stringify(userDetails));
       
       // Update state
-      setUserToken(token);
-      setUserType(type);
-    } catch (e) {
-      console.log('Login error', e);
+      setUser(userDetails);
+      return { success: true };
+    } catch (error) {
+      console.log('Login error:', error);
+      return { success: false, error: error.message || 'Login failed' };
     }
   };
 
   // Logout function
   const logout = async () => {
     try {
-      // Remove user data from AsyncStorage
-      await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('userType');
-      
-      // Reset state
-      setUserToken(null);
-      setUserType(null);
-    } catch (e) {
-      console.log('Logout error', e);
+      // Remove user from AsyncStorage
+      await AsyncStorage.removeItem('user');
+      // Update state
+      setUser(null);
+    } catch (error) {
+      console.log('Logout error:', error);
     }
   };
 
-  // Context value
-  const authContext = {
-    isLoading,
-    userToken,
-    userType,
-    login,
-    logout,
+  // Register function
+  const register = async (name, email, password, userType = 'customer') => {
+    try {
+      // Here you'd typically make an API call to your backend
+      // For now, we'll simulate a successful registration
+      const userDetails = { id: '1', name, email, userType };
+      
+      // Store user details in AsyncStorage
+      await AsyncStorage.setItem('user', JSON.stringify(userDetails));
+      
+      // Update state
+      setUser(userDetails);
+      return { success: true };
+    } catch (error) {
+      console.log('Registration error:', error);
+      return { success: false, error: error.message || 'Registration failed' };
+    }
   };
 
   return (
-    <AuthContext.Provider value={authContext}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        login,
+        logout,
+        register,
+        userType: user?.userType || 'customer' // Default to customer if not specified
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Custom hook to use the auth context
+// Custom hook to use the AuthContext
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -85,5 +102,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-export default AuthContext;
