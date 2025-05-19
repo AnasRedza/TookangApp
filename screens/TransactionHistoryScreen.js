@@ -5,250 +5,142 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
-  SafeAreaView,
-  ScrollView
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
 import Colors from '../constants/Colors';
 
 const TransactionHistoryScreen = () => {
-  const { userType } = useAuth();
-  
-  // State for transactions and filters
   const [transactions, setTransactions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('all');
   
-  // Mock transaction data - replace with API call in production
+  // Fetch transactions on component mount
   useEffect(() => {
-    // Simulate API fetch delay
-    const timer = setTimeout(() => {
+    fetchTransactions();
+  }, []);
+  
+  // Mock API call to fetch transactions
+  const fetchTransactions = () => {
+    setIsLoading(true);
+    
+    // Simulate API call delay
+    setTimeout(() => {
+      // Sample transaction data
       const mockTransactions = [
         {
-          id: '1',
-          type: 'payment',
-          amount: 120,
-          date: '2025-05-10',
-          status: 'completed',
-          title: 'Fix leaking bathroom sink',
-          recipient: 'John Plumber',
-          paymentMethod: 'Credit Card (**** 4582)'
+          id: 'txn001',
+          date: '2025-05-15T10:30:00',
+          amount: 450,
+          description: 'Bathroom Plumbing Repair',
+          status: 'completed'
         },
         {
-          id: '2',
-          type: 'payment',
-          amount: 85,
-          date: '2025-05-05',
-          status: 'escrow',
-          title: 'Install ceiling fan',
-          recipient: 'Mike Electrician',
-          paymentMethod: 'FPX Banking'
+          id: 'txn002',
+          date: '2025-05-10T14:15:00',
+          amount: 275,
+          description: 'Ceiling Fan Installation',
+          status: 'completed'
         },
         {
-          id: '3',
-          type: 'refund',
-          amount: 50,
-          date: '2025-04-28',
-          status: 'completed',
-          title: 'Cabinet installation - Partial refund',
-          recipient: 'System',
-          paymentMethod: 'Credit Card (**** 4582)'
+          id: 'txn003',
+          date: '2025-05-05T09:45:00',
+          amount: 320,
+          description: 'Kitchen Sink Repair',
+          status: 'completed'
         },
         {
-          id: '4',
-          type: userType === 'handyman' ? 'payout' : 'payment',
-          amount: 200,
-          date: '2025-04-20',
-          status: 'completed',
-          title: 'Paint living room walls',
-          recipient: userType === 'handyman' ? 'Bank Account' : 'Paul Painter',
-          paymentMethod: userType === 'handyman' ? 'Bank Transfer' : 'E-Wallet'
-        },
-        {
-          id: '5',
-          type: userType === 'handyman' ? 'payout' : 'payment',
+          id: 'txn004',
+          date: '2025-04-28T16:20:00',
           amount: 150,
-          date: '2025-04-15',
-          status: 'completed',
-          title: 'Fix garden irrigation',
-          recipient: userType === 'handyman' ? 'Bank Account' : 'Gary Gardener',
-          paymentMethod: userType === 'handyman' ? 'Bank Transfer' : 'FPX Banking'
+          description: 'Door Lock Replacement',
+          status: 'refunded'
         },
+        {
+          id: 'txn005',
+          date: '2025-04-20T11:10:00',
+          amount: 550,
+          description: 'Paint Living Room Walls',
+          status: 'completed'
+        }
       ];
       
       setTransactions(mockTransactions);
       setIsLoading(false);
-    }, 800);
-    
-    return () => clearTimeout(timer);
-  }, [userType]);
-  
-  // Filter transactions based on active filter
-  const filteredTransactions = transactions.filter(transaction => {
-    if (activeFilter === 'all') return true;
-    return transaction.type === activeFilter;
-  });
-  
-  // Get icon for transaction type
-  const getTransactionIcon = (type, status) => {
-    if (type === 'payment') {
-      if (status === 'escrow') return 'time-outline';
-      return 'arrow-up-outline';
-    }
-    if (type === 'refund') return 'refresh-outline';
-    if (type === 'payout') return 'cash-outline';
-    return 'card-outline';
+    }, 1000);
   };
   
-  // Get color for transaction status
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return '#4CAF50';
-      case 'escrow': return '#FB8C00';
-      case 'pending': return '#42A5F5';
-      case 'failed': return '#F44336';
-      default: return '#9E9E9E';
-    }
+  // Format date
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-MY', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
   
-  // Get transaction amount display with +/-
-  const getTransactionAmount = (transaction) => {
-    if (userType === 'customer') {
-      if (transaction.type === 'refund') {
-        return `+RM${transaction.amount}`;
-      }
-      return `-RM${transaction.amount}`;
-    } else {
-      // For handyman
-      if (transaction.type === 'payout') {
-        return `+RM${transaction.amount}`;
-      }
-      return `-RM${transaction.amount}`;
-    }
-  };
-  
-  // Get color for transaction amount
-  const getAmountColor = (transaction) => {
-    if (userType === 'customer') {
-      return transaction.type === 'refund' ? '#4CAF50' : '#333333';
-    } else {
-      return transaction.type === 'payout' ? '#4CAF50' : '#333333';
+  // Get status icon and color
+  const getStatusInfo = (status) => {
+    switch(status) {
+      case 'completed':
+        return { color: '#4CAF50', label: 'Completed' };
+      case 'refunded':
+        return { color: '#F44336', label: 'Refunded' };
+      default:
+        return { color: '#757575', label: 'Unknown' };
     }
   };
   
   // Render transaction item
-  const renderTransactionItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.transactionItem}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.iconContainer, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-        <Ionicons name={getTransactionIcon(item.type, item.status)} size={24} color={getStatusColor(item.status)} />
-      </View>
-      
-      <View style={styles.transactionDetails}>
-        <Text style={styles.transactionTitle} numberOfLines={1}>{item.title}</Text>
+  const renderTransactionItem = ({ item }) => {
+    const statusInfo = getStatusInfo(item.status);
+    
+    return (
+      <View style={styles.transactionItem}>
+        <View style={styles.transactionHeader}>
+          <Text style={styles.serviceDescription}>{item.description}</Text>
+          <Text style={[styles.statusText, { color: statusInfo.color }]}>{statusInfo.label}</Text>
+        </View>
         
-        <View style={styles.transactionSubDetails}>
+        <View style={styles.transactionDetails}>
           <Text style={styles.transactionDate}>{formatDate(item.date)}</Text>
-          <View style={styles.dotSeparator} />
-          <Text style={styles.transactionMethod}>{item.paymentMethod}</Text>
-        </View>
-        
-        <View style={styles.statusContainer}>
-          <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-            {capitalizeFirstLetter(item.status)}
-          </Text>
+          <Text style={styles.transactionAmount}>RM {item.amount.toFixed(2)}</Text>
         </View>
       </View>
-      
-      <Text 
-        style={[
-          styles.transactionAmount, 
-          { color: getAmountColor(item) }
-        ]}
-      >
-        {getTransactionAmount(item)}
-      </Text>
-    </TouchableOpacity>
-  );
-  
-  // Helper to format date
-  const formatDate = (dateString) => {
-    const options = { year: 'numeric', month: 'short', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    );
   };
-  
-  // Helper to capitalize first letter
-  const capitalizeFirstLetter = (string) => {
-    return string.charAt(0).toUpperCase() + string.slice(1);
+
+  // Render empty state
+  const renderEmptyState = () => {
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="receipt-outline" size={50} color="#CCCCCC" />
+        <Text style={styles.emptyTitle}>No Transactions</Text>
+        <Text style={styles.emptyDescription}>
+          Your transaction history will appear here
+        </Text>
+      </View>
+    );
   };
-  
-  // Render filter chip
-  const renderFilterChip = (filter, label) => (
-    <TouchableOpacity
-      style={[
-        styles.filterChip,
-        activeFilter === filter && styles.activeFilterChip
-      ]}
-      onPress={() => setActiveFilter(filter)}
-    >
-      <Text
-        style={[
-          styles.filterChipText,
-          activeFilter === filter && styles.activeFilterChipText
-        ]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-  
-  // Empty list component
-  const renderEmptyList = () => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="receipt-outline" size={64} color="#DDD" />
-      <Text style={styles.emptyTitle}>No Transactions Yet</Text>
-      <Text style={styles.emptyText}>
-        {userType === 'customer' 
-          ? 'Your transaction history will appear here when you make payments'
-          : 'Your transaction history will appear here when you receive payments'
-        }
-      </Text>
-    </View>
-  );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Filter section */}
-      <View style={styles.filtersContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersScrollContent}>
-          {renderFilterChip('all', 'All')}
-          {renderFilterChip('payment', 'Payments')}
-          {userType === 'customer' && renderFilterChip('refund', 'Refunds')}
-          {userType === 'handyman' && renderFilterChip('payout', 'Payouts')}
-        </ScrollView>
-      </View>
+    <View style={styles.container}>
+      <Text style={styles.screenTitle}>Transaction History</Text>
       
-      {/* Main content */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Loading transactions...</Text>
         </View>
       ) : (
         <FlatList
-          data={filteredTransactions}
+          data={transactions}
           renderItem={renderTransactionItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={renderEmptyList}
-          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={renderEmptyState}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -257,105 +149,56 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F8F8',
   },
-  filtersContainer: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
+  screenTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333333',
+    margin: 16,
   },
-  filtersScrollContent: {
-    paddingRight: 16,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
-    backgroundColor: '#F1F1F1',
-  },
-  activeFilterChip: {
-    backgroundColor: Colors.primary + '20',
-  },
-  filterChipText: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  activeFilterChipText: {
-    color: Colors.primary,
-    fontWeight: '600',
+  listContainer: {
+    padding: 16,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#666666',
-  },
-  listContainer: {
-    padding: 16,
-    paddingBottom: 30,
-  },
   transactionItem: {
-    flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 10,
     marginBottom: 12,
-    alignItems: 'center',
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
   },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
+  transactionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginRight: 16,
+    marginBottom: 10,
   },
-  transactionDetails: {
-    flex: 1,
-    marginRight: 12,
-  },
-  transactionTitle: {
-    fontSize: 15,
+  serviceDescription: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#333333',
-    marginBottom: 4,
-  },
-  transactionSubDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  transactionDate: {
-    fontSize: 13,
-    color: '#666666',
-  },
-  dotSeparator: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: '#BBBBBB',
-    marginHorizontal: 6,
-  },
-  transactionMethod: {
-    fontSize: 13,
-    color: '#666666',
-  },
-  statusContainer: {
-    alignSelf: 'flex-start',
+    flex: 1,
+    marginRight: 10,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  transactionDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  transactionDate: {
+    fontSize: 14,
+    color: '#666666',
   },
   transactionAmount: {
     fontSize: 16,
@@ -363,9 +206,9 @@ const styles = StyleSheet.create({
     color: '#333333',
   },
   emptyContainer: {
-    paddingVertical: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 40,
   },
   emptyTitle: {
     fontSize: 18,
@@ -374,11 +217,10 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
-  emptyText: {
+  emptyDescription: {
     fontSize: 14,
     color: '#666666',
     textAlign: 'center',
-    maxWidth: '80%',
   },
 });
 

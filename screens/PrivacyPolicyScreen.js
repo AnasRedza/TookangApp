@@ -2,49 +2,72 @@ import React from 'react';
 import { 
   View, 
   Text, 
-  StyleSheet, // Make sure this is included
-  ScrollView 
+  StyleSheet,
+  ScrollView,
+  SafeAreaView
 } from 'react-native';
-
-// Component code...
+import Colors from '../constants/Colors';
 
 const PrivacyPolicyScreen = () => {
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Privacy Policy</Text>
-        <Text style={styles.lastUpdated}>Last Updated: May 15, 2025</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView>
+        <View style={styles.section}>
+          <Text style={styles.title}>Privacy Policy</Text>
+          <Text style={styles.lastUpdated}>Last Updated: May 15, 2025</Text>
+        </View>
         
-        <Text style={styles.sectionTitle}>1. Introduction</Text>
-        <Text style={styles.paragraph}>
-          Welcome to TooKang's Privacy Policy. This policy describes how TooKang collects, uses, and shares your personal information when you use our mobile application and services.
-        </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Introduction</Text>
+          <View style={styles.divider} />
+          <Text style={styles.paragraph}>
+            Welcome to TooKang's Privacy Policy. This policy describes how TooKang collects, uses, and shares your personal information when you use our mobile application and services.
+          </Text>
+        </View>
         
-        <Text style={styles.sectionTitle}>2. Information We Collect</Text>
-        <Text style={styles.paragraph}>
-          We collect information you provide directly to us, such as when you create an account, complete your profile, post projects, or communicate with other users. This may include your name, email address, phone number, location, profile picture, and payment information.
-        </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Information We Collect</Text>
+          <View style={styles.divider} />
+          <Text style={styles.paragraph}>
+            We collect information you provide directly to us, such as when you create an account, complete your profile, post projects, or communicate with other users. This may include your name, email address, phone number, location, profile picture, and payment information.
+          </Text>
+        </View>
         
-        <Text style={styles.sectionTitle}>3. How We Use Your Information</Text>
-        <Text style={styles.paragraph}>
-          We use the information we collect to provide, maintain, and improve our services, to process transactions, to communicate with you about your account and our services, and to personalize your experience.
-        </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>How We Use Your Information</Text>
+          <View style={styles.divider} />
+          <Text style={styles.paragraph}>
+            We use the information we collect to provide, maintain, and improve our services, to process transactions, to communicate with you about your account and our services, and to personalize your experience.
+          </Text>
+        </View>
         
-        {/* More sections would go here in a real app */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Information Sharing</Text>
+          <View style={styles.divider} />
+          <Text style={styles.paragraph}>
+            We may share your information with service providers who perform services on our behalf, with other users as needed to fulfill your requests, and as required by law or to protect our rights.
+          </Text>
+        </View>
         
-        <Text style={styles.contactInfo}>
-          If you have any questions about this Privacy Policy, please contact us at:
-          {'\n\n'}
-          TooKang Inc.
-          {'\n'}
-          123 Main Street
-          {'\n'}
-          Kuala Lumpur, Malaysia
-          {'\n'}
-          privacy@tookang.com
-        </Text>
-      </View>
-    </ScrollView>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Your Choices</Text>
+          <View style={styles.divider} />
+          <Text style={styles.paragraph}>
+            You can update your account information and notification preferences through your account settings. You may also request deletion of your account by contacting our support team.
+          </Text>
+        </View>
+        
+        <View style={styles.contactSection}>
+          <Text style={styles.contactTitle}>Contact Us</Text>
+          <Text style={styles.contactInfo}>
+            TooKang Inc.{'\n'}
+            123 Main Street{'\n'}
+            Kuala Lumpur, Malaysia{'\n\n'}
+            privacy@tookang.com
+          </Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
@@ -53,42 +76,54 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  content: {
-    padding: 16,
+  section: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 10,
   },
   title: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '600',
+    color: '#333333',
     marginBottom: 8,
   },
   lastUpdated: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 24,
+    color: '#666666',
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
-    marginTop: 24,
-    marginBottom: 12,
+    color: '#333333',
+    marginBottom: 16,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginBottom: 16,
   },
   paragraph: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#444',
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#333333',
+  },
+  contactSection: {
+    margin: 16,
+    padding: 16,
+    backgroundColor: '#F8F8F8',
+    borderRadius: 8,
+  },
+  contactTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333333',
     marginBottom: 16,
   },
   contactInfo: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#555',
-    marginTop: 32,
-    marginBottom: 40,
-    backgroundColor: '#F8F8F8',
-    padding: 16,
-    borderRadius: 8,
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#666666',
   }
 });
 

@@ -12,14 +12,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 
-// Mock data for demonstration
+// Updated categories - only 5 as requested
 const CATEGORIES = [
-  { id: '1', name: 'Plumbing', icon: 'water-outline' },
-  { id: '2', name: 'Electrical', icon: 'flash-outline' },
-  { id: '3', name: 'Carpentry', icon: 'hammer-outline' },
-  { id: '4', name: 'Painting', icon: 'color-palette-outline' },
-  { id: '5', name: 'Cleaning', icon: 'sparkles-outline' },
-  { id: '6', name: 'Gardening', icon: 'leaf-outline' }
+  { id: '1', name: 'Plumber', icon: 'water-outline' },
+  { id: '2', name: 'Electrician', icon: 'flash-outline' },
+  { id: '3', name: 'Painter', icon: 'color-palette-outline' },
+  { id: '4', name: 'Cleaner', icon: 'sparkles-outline' },
+  { id: '5', name: 'Others', icon: 'apps-outline' }
 ];
 
 const HANDYMEN = [
@@ -74,10 +73,19 @@ const HomeScreen = ({ navigation }) => {
     if (selectedCategory) {
       const category = CATEGORIES.find(c => c.id === selectedCategory);
       if (category) {
-        const filtered = HANDYMEN.filter(
-          handyman => handyman.profession.toLowerCase() === category.name.toLowerCase()
-        );
-        setHandymen(filtered);
+        if (category.name === 'Others') {
+          // For 'Others' category, show all handymen not matching other specific categories
+          const specificProfessions = ['Plumber', 'Electrician', 'Painter', 'Cleaner'];
+          const filtered = HANDYMEN.filter(
+            handyman => !specificProfessions.includes(handyman.profession)
+          );
+          setHandymen(filtered);
+        } else {
+          const filtered = HANDYMEN.filter(
+            handyman => handyman.profession.toLowerCase() === category.name.toLowerCase()
+          );
+          setHandymen(filtered);
+        }
       }
     } else {
       setHandymen(HANDYMEN);
@@ -144,11 +152,6 @@ const HomeScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
-      {/* Simple Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>TooKang</Text>
-      </View>
-      
       {/* Categories */}
       <View style={styles.categorySection}>
         <FlatList
@@ -197,21 +200,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  header: {
-    padding: 15,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333333',
-  },
   categorySection: {
-    paddingVertical: 12,
+    paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+    marginTop: 10,
   },
   categoryList: {
     paddingHorizontal: 10,

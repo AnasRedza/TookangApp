@@ -1,9 +1,9 @@
-import React, { Alert } from 'react';
-import { View, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Image, Alert } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createDrawerNavigator } from '@react-navigation/drawer';
+import { createDrawerNavigator, DrawerContentScrollView } from '@react-navigation/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import Colors from '../constants/Colors';
@@ -16,6 +16,7 @@ import OnboardingScreen from '../screens/OnboardingScreen';
 
 // Home Stack Screens
 import HomeScreen from '../screens/HomeScreen';
+import HandymanHomeScreen from '../screens/HandymanHomeScreen';
 import HandymanDetailScreen from '../screens/HandymanDetailScreen';
 import ProjectBidScreen from '../screens/ProjectBidScreen';
 import ServiceCategoryScreen from '../screens/ServiceCategoryScreen';
@@ -27,6 +28,7 @@ import ProjectDetailScreen from '../screens/ProjectDetailScreen';
 import ProjectOfferScreen from '../screens/ProjectOfferScreen';
 import BudgetAdjustmentScreen from '../screens/BudgetAdjustmentScreen';
 import AdjustmentApprovalScreen from '../screens/AdjustmentApprovalScreen';
+import ReviewScreen from '../screens/ReviewScreen';
 
 // Payment Screens
 import PaymentScreen from '../screens/PaymentScreen';
@@ -41,6 +43,7 @@ import ChatScreen from '../screens/ChatScreen';
 // Profile Stack Screens
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
 
 // Additional Screens
@@ -48,57 +51,46 @@ import HelpScreen from '../screens/HelpScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import AboutScreen from '../screens/AboutScreen';
 import HelpTopicScreen from '../screens/HelpTopicScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 
 // Create navigators
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const Drawer = createDrawerNavigator();
 
-// Menu button component
-const MenuButton = ({ navigation }) => (
-  <TouchableOpacity 
-    style={{ marginLeft: 15 }}
-    onPress={() => navigation.openDrawer()}
-  >
-    <Ionicons name="menu" size={24} color="#FFFFFF" />
-  </TouchableOpacity>
-);
-
-// Back button with drawer option
-const BackButtonWithDrawer = ({ navigation, canGoBack }) => {
-  if (canGoBack) {
+// Menu button component - Only shows on Home and HandymanHome screens
+const MenuButton = ({ navigation, screenName }) => {
+  // Only show the menu button on HomeScreen and HandymanHomeScreen
+  if (screenName === 'Home' || screenName === 'HandymanHome') {
     return (
       <TouchableOpacity 
         style={{ marginLeft: 15 }}
-        onPress={() => navigation.goBack()}
+        onPress={() => navigation.openDrawer()}
       >
-        <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+        <Ionicons name="menu" size={24} color="#FFFFFF" />
       </TouchableOpacity>
     );
-  } else {
-    return <MenuButton navigation={navigation} />;
   }
-};
-
-// Common header options with drawer menu
-const getScreenOptions = (navigation) => ({
-  headerStyle: { backgroundColor: Colors.primary },
-  headerTintColor: '#FFFFFF',
-  headerTitleStyle: { fontWeight: 'bold' },
-  headerLeft: () => <MenuButton navigation={navigation} />
-});
-
-// Authentication Stack Navigator
-const AuthStack = () => {
+  
+  // For all other screens, return a back button instead
   return (
-    <Stack.Navigator screenOptions={screenOptionsBase} initialRouteName="Onboarding">
-      <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Login" component={LoginScreen} options={{ title: 'Sign In' }} />
-      <Stack.Screen name="Register" component={RegisterScreen} options={{ title: 'Create Account' }} />
-      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Reset Password' }} />
-    </Stack.Navigator>
+    <TouchableOpacity 
+      style={{ marginLeft: 15 }}
+      onPress={() => navigation.goBack()}
+    >
+      <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+    </TouchableOpacity>
   );
 };
+
+// Logo component for header
+const LogoTitle = () => (
+  <Image
+    source={require('../assets/images/tookang_logo.png')}
+    style={{ height: 30, width: 120 }}
+    resizeMode="contain"
+  />
+);
 
 // Base screen options without menu button
 const screenOptionsBase = {
@@ -107,102 +99,255 @@ const screenOptionsBase = {
   headerTitleStyle: { fontWeight: 'bold' }
 };
 
+// Authentication Stack Navigator
+const AuthStack = () => {
+  return (
+    <Stack.Navigator screenOptions={screenOptionsBase} initialRouteName="Onboarding">
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
+      <Stack.Screen 
+        name="Login" 
+        component={LoginScreen} 
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen 
+        name="Register" 
+        component={RegisterScreen} 
+        options={{ 
+          headerTitle: () => <LogoTitle />
+        }} 
+      />
+      <Stack.Screen 
+        name="ForgotPassword" 
+        component={ForgotPasswordScreen} 
+        options={{ 
+          headerTitle: () => <LogoTitle />
+        }} 
+      />
+    </Stack.Navigator>
+  );
+};
+
 // Home Stack Navigator
 const HomeStack = () => {
+  const { isHandyman } = useAuth();
+  
   return (
     <Stack.Navigator 
-      initialRouteName="Home"
+      initialRouteName={isHandyman ? "HandymanHome" : "Home"}
       screenOptions={({ navigation, route }) => ({
         ...screenOptionsBase,
-        headerLeft: () => {
-          const isFirstRouteInParent = route.name === 'Home';
-          return isFirstRouteInParent 
-            ? <MenuButton navigation={navigation} />
-            : <BackButtonWithDrawer navigation={navigation} canGoBack={true} />;
-        }
+        headerLeft: () => <MenuButton navigation={navigation} screenName={route.name} />,
+        headerTitle: () => <LogoTitle />,
+        // Add role indicator for handyman in the header right area
+        headerRight: () => isHandyman ? (
+          <View style={styles.headerRoleBadge}>
+            <Text style={styles.headerRoleBadgeText}>HANDYMAN</Text>
+          </View>
+        ) : null
       })}
     >
-      <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'TooKang' }} />
-      <Stack.Screen name="HandymanDetail" component={HandymanDetailScreen} options={{ title: 'Handyman Profile' }} />
-      <Stack.Screen name="ProjectBid" component={ProjectBidScreen} options={{ title: 'Create Project' }} />
-      <Stack.Screen name="ServiceCategory" component={ServiceCategoryScreen} 
-        options={({ route }) => ({ title: route.params?.category || 'Category' })} />
-      <Stack.Screen name="SearchResults" component={SearchResultsScreen} options={{ title: 'Search Results' }} />
-      <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment' }} />
-      <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} 
-        options={{ title: 'Payment Complete', headerLeft: () => null }} />
-      <Stack.Screen name="AdjustmentApproval" component={AdjustmentApprovalScreen} options={{ title: 'Budget Adjustment' }} />
+      {/* Regular Home Screen for Customers */}
+      <Stack.Screen 
+        name="Home" 
+        component={HomeScreen} 
+        options={{ 
+          title: 'Home'
+        }}
+      />
+      
+      {/* Handyman-specific Home Screen */}
+      <Stack.Screen 
+        name="HandymanHome" 
+        component={HandymanHomeScreen} 
+        options={{ 
+          title: 'Available Jobs'
+        }}
+      />
+      
+      <Stack.Screen name="HandymanDetail" component={HandymanDetailScreen} />
+      <Stack.Screen name="ProjectBid" component={ProjectBidScreen} />
+      <Stack.Screen name="ServiceCategory" component={ServiceCategoryScreen} />
+      <Stack.Screen name="SearchResults" component={SearchResultsScreen} />
+      
+      {/* IMPORTANT: Add ProjectDetailScreen to HomeStack too */}
+      <Stack.Screen name="ProjectDetails" component={ProjectDetailScreen} />
+      <Stack.Screen name="ProjectOffer" component={ProjectOfferScreen} />
+      
+      <Stack.Screen name="Payment" component={PaymentScreen} />
+      <Stack.Screen 
+        name="PaymentSuccess" 
+        component={PaymentSuccessScreen} 
+        options={{ headerLeft: () => null }} 
+      />
+      <Stack.Screen name="AdjustmentApproval" component={AdjustmentApprovalScreen} />
+      
+      {/* Add the ReviewScreen */}
+      <Stack.Screen 
+        name="ReviewScreen" 
+        component={ReviewScreen}
+        options={{ 
+          title: 'Write a Review',
+          headerBackTitle: 'Back'
+        }} 
+      />
     </Stack.Navigator>
   );
 };
 
 // Projects Stack Navigator
 const ProjectsStack = () => {
+  const { isHandyman } = useAuth();
+  
   return (
     <Stack.Navigator 
       initialRouteName="MyProjects"
       screenOptions={({ navigation, route }) => ({
         ...screenOptionsBase,
-        headerLeft: () => {
-          const isFirstRouteInParent = route.name === 'MyProjects';
-          return isFirstRouteInParent 
-            ? <MenuButton navigation={navigation} />
-            : <BackButtonWithDrawer navigation={navigation} canGoBack={true} />;
-        }
+        headerLeft: () => (
+          <TouchableOpacity 
+            style={{ marginLeft: 15 }}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        ),
+        headerTitle: () => <LogoTitle />,
+        // Add role indicator for handyman in the header right area
+        headerRight: () => isHandyman ? (
+          <View style={styles.headerRoleBadge}>
+            <Text style={styles.headerRoleBadgeText}>HANDYMAN</Text>
+          </View>
+        ) : null
       })}
     >
-      <Stack.Screen name="MyProjects" component={MyProjectsScreen} options={{ title: 'My Projects' }} />
-      <Stack.Screen name="ProjectDetails" component={ProjectDetailScreen} options={{ title: 'Project Details' }} />
-      <Stack.Screen name="ProjectOffer" component={ProjectOfferScreen} options={{ title: 'Make an Offer' }} />
-      <Stack.Screen name="BudgetAdjustment" component={BudgetAdjustmentScreen} options={{ title: 'Adjust Budget' }} />
-      <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment' }} />
-      <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} 
-        options={{ title: 'Payment Complete', headerLeft: () => null }} />
-      <Stack.Screen name="AdjustmentApproval" component={AdjustmentApprovalScreen} options={{ title: 'Budget Adjustment' }} />
+      <Stack.Screen 
+        name="MyProjects" 
+        component={MyProjectsScreen} 
+        options={({ route }) => ({ 
+          title: isHandyman ? 'My Jobs' : 'My Projects'
+        })}
+      />
+      
+      {/* IMPORTANT: Make sure the name is exactly "ProjectDetails" */}
+      <Stack.Screen name="ProjectDetails" component={ProjectDetailScreen} />
+      
+      <Stack.Screen name="ProjectOffer" component={ProjectOfferScreen} />
+      <Stack.Screen name="BudgetAdjustment" component={BudgetAdjustmentScreen} />
+      <Stack.Screen name="Payment" component={PaymentScreen} />
+      <Stack.Screen 
+        name="PaymentSuccess" 
+        component={PaymentSuccessScreen}
+        options={{ headerLeft: () => null }} 
+      />
+      <Stack.Screen name="AdjustmentApproval" component={AdjustmentApprovalScreen} />
+      
+      {/* Add the ReviewScreen */}
+      <Stack.Screen 
+        name="ReviewScreen" 
+        component={ReviewScreen}
+        options={{ 
+          title: 'Write a Review',
+          headerBackTitle: 'Back'
+        }} 
+      />
     </Stack.Navigator>
   );
 };
 
 // Chat Stack Navigator
 const ChatStack = () => {
+  const { isHandyman } = useAuth();
+  
   return (
     <Stack.Navigator 
       initialRouteName="Chats"
       screenOptions={({ navigation, route }) => ({
         ...screenOptionsBase,
-        headerLeft: () => {
-          const isFirstRouteInParent = route.name === 'Chats';
-          return isFirstRouteInParent 
-            ? <MenuButton navigation={navigation} />
-            : <BackButtonWithDrawer navigation={navigation} canGoBack={true} />;
-        }
+        headerLeft: () => (
+          <TouchableOpacity 
+            style={{ marginLeft: 15 }}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        ),
+        headerTitle: route.name === 'Chats' ? () => <LogoTitle /> : undefined,
+        // Add role indicator for handyman in the header right area when not in a chat
+        headerRight: () => (route.name === 'Chats' && isHandyman) ? (
+          <View style={styles.headerRoleBadge}>
+            <Text style={styles.headerRoleBadgeText}>HANDYMAN</Text>
+          </View>
+        ) : null
       })}
     >
-      <Stack.Screen name="Chats" component={ChatListScreen} options={{ title: 'Messages' }} />
-      <Stack.Screen name="Chat" component={ChatScreen} 
-        options={({ route }) => ({ title: route.params?.recipient?.name || 'Chat' })} />
+      <Stack.Screen name="Chats" component={ChatListScreen} />
+      <Stack.Screen 
+        name="Chat" 
+        component={ChatScreen} 
+        options={({ route }) => ({ title: route.params?.recipient?.name || 'Chat' })} 
+      />
+      
+      {/* IMPORTANT: Add these screens to enable navigation from chat */}
+      <Stack.Screen name="ProjectDetails" component={ProjectDetailScreen} />
+      <Stack.Screen name="ProjectOffer" component={ProjectOfferScreen} />
+      
+      {/* Add ReviewScreen here too in case it's needed from chat */}
+      <Stack.Screen 
+        name="ReviewScreen" 
+        component={ReviewScreen}
+        options={{ 
+          title: 'Write a Review',
+          headerBackTitle: 'Back'
+        }} 
+      />
     </Stack.Navigator>
   );
 };
 
 // Profile Stack Navigator
 const ProfileStack = () => {
+  const { isHandyman } = useAuth();
+  
   return (
     <Stack.Navigator 
       initialRouteName="Profile"
       screenOptions={({ navigation, route }) => ({
         ...screenOptionsBase,
-        headerLeft: () => {
-          const isFirstRouteInParent = route.name === 'Profile';
-          return isFirstRouteInParent 
-            ? <MenuButton navigation={navigation} />
-            : <BackButtonWithDrawer navigation={navigation} canGoBack={true} />;
-        }
+        headerLeft: () => (
+          <TouchableOpacity 
+            style={{ marginLeft: 15 }}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        ),
+        headerTitle: route.name === 'Profile' ? () => <LogoTitle /> : undefined,
+        // Add role indicator for handyman in the header right area when on profile screen
+        headerRight: () => (route.name === 'Profile' && isHandyman) ? (
+          <View style={styles.headerRoleBadge}>
+            <Text style={styles.headerRoleBadgeText}>HANDYMAN</Text>
+          </View>
+        ) : null
       })}
     >
-      <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'My Profile' }} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Edit Profile' }} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Change Password' }} />
       <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ title: 'Notification Settings' }} />
+      
+      {/* IMPORTANT: Add these screens to enable navigation from profile */}
+      <Stack.Screen name="ProjectDetails" component={ProjectDetailScreen} />
+      <Stack.Screen name="ProjectOffer" component={ProjectOfferScreen} />
+      
+      {/* Add ReviewScreen here too in case it's needed from profile (e.g. viewing past reviews) */}
+      <Stack.Screen 
+        name="ReviewScreen" 
+        component={ReviewScreen}
+        options={{ 
+          title: 'Write a Review',
+          headerBackTitle: 'Back'
+        }} 
+      />
     </Stack.Navigator>
   );
 };
@@ -214,17 +359,23 @@ const HelpStack = () => {
       initialRouteName="Help"
       screenOptions={({ navigation, route }) => ({
         ...screenOptionsBase,
-        headerLeft: () => {
-          const isFirstRouteInParent = route.name === 'Help';
-          return isFirstRouteInParent 
-            ? <MenuButton navigation={navigation} />
-            : <BackButtonWithDrawer navigation={navigation} canGoBack={true} />;
-        }
+        headerLeft: () => (
+          <TouchableOpacity 
+            style={{ marginLeft: 15 }}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        ),
+        headerTitle: route.name === 'Help' ? () => <LogoTitle /> : undefined
       })}
     >
-      <Stack.Screen name="Help" component={HelpScreen} options={{ title: 'Help & Support' }} />
-      <Stack.Screen name="HelpTopic" component={HelpTopicScreen}
-        options={({ route }) => ({ title: route.params?.topic?.title || 'Help Topic' })} />
+      <Stack.Screen name="Help" component={HelpScreen} />
+      <Stack.Screen 
+        name="HelpTopic" 
+        component={HelpTopicScreen}
+        options={({ route }) => ({ title: route.params?.topic?.title || 'Help Topic' })} 
+      />
     </Stack.Navigator>
   );
 };
@@ -236,17 +387,33 @@ const SettingsStack = () => {
       initialRouteName="Settings"
       screenOptions={({ navigation, route }) => ({
         ...screenOptionsBase,
-        headerLeft: () => {
-          const isFirstRouteInParent = route.name === 'Settings';
-          return isFirstRouteInParent 
-            ? <MenuButton navigation={navigation} />
-            : <BackButtonWithDrawer navigation={navigation} canGoBack={true} />;
-        }
+        headerLeft: () => (
+          <TouchableOpacity 
+            style={{ marginLeft: 15 }}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        ),
+        headerTitle: route.name === 'Settings' ? () => <LogoTitle /> : undefined
       })}
     >
-      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
-      <Stack.Screen name="SettingsNotifications" component={NotificationSettingsScreen} 
-        options={{ title: 'Notification Settings' }} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen 
+        name="SettingsNotifications" 
+        component={NotificationSettingsScreen} 
+        options={{ title: 'Notification Settings' }} 
+      />
+      <Stack.Screen 
+        name="ChangePassword" 
+        component={ChangePasswordScreen} 
+        options={{ title: 'Change Password' }} 
+      />
+      <Stack.Screen 
+        name="PrivacyPolicy" 
+        component={PrivacyPolicyScreen} 
+        options={{ title: 'Privacy Policy' }} 
+      />
     </Stack.Navigator>
   );
 };
@@ -258,10 +425,18 @@ const PaymentMethodsStack = () => {
       initialRouteName="PaymentMethods"
       screenOptions={({ navigation }) => ({
         ...screenOptionsBase,
-        headerLeft: () => <MenuButton navigation={navigation} />
+        headerLeft: () => (
+          <TouchableOpacity 
+            style={{ marginLeft: 15 }}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        ),
+        headerTitle: () => <LogoTitle />
       })}
     >
-      <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} options={{ title: 'Payment Methods' }} />
+      <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
     </Stack.Navigator>
   );
 };
@@ -271,12 +446,20 @@ const TransactionHistoryStack = () => {
   return (
     <Stack.Navigator 
       initialRouteName="TransactionHistory"
-      screenOptions={({ navigation }) => ({
+      screenOptions={({ navigation, route }) => ({
         ...screenOptionsBase,
-        headerLeft: () => <MenuButton navigation={navigation} />
+        headerLeft: () => (
+          <TouchableOpacity 
+            style={{ marginLeft: 15 }}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        ),
+        headerTitle: () => <LogoTitle />
       })}
     >
-      <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} options={{ title: 'Transaction History' }} />
+      <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
     </Stack.Navigator>
   );
 };
@@ -288,23 +471,41 @@ const AboutStack = () => {
       initialRouteName="About"
       screenOptions={({ navigation }) => ({
         ...screenOptionsBase,
-        headerLeft: () => <MenuButton navigation={navigation} />
+        headerLeft: () => (
+          <TouchableOpacity 
+            style={{ marginLeft: 15 }}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        ),
+        headerTitle: () => <LogoTitle />
       })}
     >
-      <Stack.Screen name="About" component={AboutScreen} options={{ title: 'About Us' }} />
+      <Stack.Screen name="About" component={AboutScreen} />
+      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ title: 'Privacy Policy' }} />
     </Stack.Navigator>
   );
 };
 
 // Main Tab Navigator
 const MainTabs = () => {
+  const { isHandyman } = useAuth(); // Get role info
+  
   return (
     <Tab.Navigator
       initialRouteName="HomeTab"
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
-          if (route.name === 'HomeTab') iconName = focused ? 'home' : 'home-outline';
+          if (route.name === 'HomeTab') {
+            // Different icons for handyman vs customer
+            if (isHandyman) {
+              iconName = focused ? 'briefcase' : 'briefcase-outline';
+            } else {
+              iconName = focused ? 'home' : 'home-outline';
+            }
+          }
           else if (route.name === 'ProjectsTab') iconName = focused ? 'list' : 'list-outline';
           else if (route.name === 'ChatTab') iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
           else if (route.name === 'ProfileTab') iconName = focused ? 'person' : 'person-outline';
@@ -315,17 +516,187 @@ const MainTabs = () => {
         headerShown: false
       })}
     >
-      <Tab.Screen name="HomeTab" component={HomeStack} options={{ title: 'Home' }} />
-      <Tab.Screen name="ProjectsTab" component={ProjectsStack} options={{ title: 'Projects' }} />
+      <Tab.Screen 
+        name="HomeTab" 
+        component={HomeStack} 
+        options={{ 
+          title: isHandyman ? 'Available Jobs' : 'Home'
+        }} 
+      />
+      <Tab.Screen 
+        name="ProjectsTab"
+        component={ProjectsStack} 
+        options={{ 
+          title: isHandyman ? 'My Jobs' : 'My Projects' 
+        }} 
+      />
       <Tab.Screen name="ChatTab" component={ChatStack} options={{ title: 'Messages' }} />
       <Tab.Screen name="ProfileTab" component={ProfileStack} options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );
 };
 
+// Custom Drawer Content Component
+const CustomDrawerContent = (props) => {
+  const { logout, user, isHandyman } = useAuth();
+  
+  return (
+    <DrawerContentScrollView {...props}>
+      {/* Logo Header - Always shown for both user types */}
+      <View style={styles.drawerHeader}>
+        <Image 
+          source={require('../assets/images/tookang_logo.png')}
+          style={styles.drawerLogo}
+          resizeMode="contain"
+        />
+      </View>
+      
+      {/* Custom drawer items based on user type */}
+      {isHandyman ? (
+        // Handyman - Only show specific menu items
+        <View>
+          {/* Earnings */}
+          <TouchableOpacity 
+            style={styles.drawerItem}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              props.navigation.navigate('EarningsDrawer');
+            }}
+          >
+            <Ionicons name="cash" size={24} color="#666" style={styles.drawerItemIcon} />
+            <Text style={styles.drawerItemText}>My Earnings</Text>
+          </TouchableOpacity>
+          
+          {/* Help & Support */}
+          <TouchableOpacity 
+            style={styles.drawerItem}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              props.navigation.navigate('HelpDrawer');
+            }}
+          >
+            <Ionicons name="help-circle" size={24} color="#666" style={styles.drawerItemIcon} />
+            <Text style={styles.drawerItemText}>Help & Support</Text>
+          </TouchableOpacity>
+          
+          {/* Settings */}
+          <TouchableOpacity 
+            style={styles.drawerItem}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              props.navigation.navigate('SettingsDrawer');
+            }}
+          >
+            <Ionicons name="settings" size={24} color="#666" style={styles.drawerItemIcon} />
+            <Text style={styles.drawerItemText}>Settings</Text>
+          </TouchableOpacity>
+          
+          {/* About Us */}
+          <TouchableOpacity 
+            style={styles.drawerItem}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              props.navigation.navigate('AboutDrawer');
+            }}
+          >
+            <Ionicons name="information-circle" size={24} color="#666" style={styles.drawerItemIcon} />
+            <Text style={styles.drawerItemText}>About Us</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        // Customer - Only show payment methods and other specified menu items
+        <View>
+          {/* Payment Methods */}
+          <TouchableOpacity 
+            style={styles.drawerItem}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              props.navigation.navigate('PaymentMethodsDrawer');
+            }}
+          >
+            <Ionicons name="card" size={24} color="#666" style={styles.drawerItemIcon} />
+            <Text style={styles.drawerItemText}>Payment Methods</Text>
+          </TouchableOpacity>
+          
+          {/* Transaction History */}
+          <TouchableOpacity 
+            style={styles.drawerItem}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              props.navigation.navigate('TransactionHistoryDrawer');
+            }}
+          >
+            <Ionicons name="receipt" size={24} color="#666" style={styles.drawerItemIcon} />
+            <Text style={styles.drawerItemText}>Transaction History</Text>
+          </TouchableOpacity>
+          
+          {/* Help & Support */}
+          <TouchableOpacity 
+            style={styles.drawerItem}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              props.navigation.navigate('HelpDrawer');
+            }}
+          >
+            <Ionicons name="help-circle" size={24} color="#666" style={styles.drawerItemIcon} />
+            <Text style={styles.drawerItemText}>Help & Support</Text>
+          </TouchableOpacity>
+          
+          {/* Settings */}
+          <TouchableOpacity 
+            style={styles.drawerItem}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              props.navigation.navigate('SettingsDrawer');
+            }}
+          >
+            <Ionicons name="settings" size={24} color="#666" style={styles.drawerItemIcon} />
+            <Text style={styles.drawerItemText}>Settings</Text>
+          </TouchableOpacity>
+          
+          {/* About Us */}
+          <TouchableOpacity 
+            style={styles.drawerItem}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              props.navigation.navigate('AboutDrawer');
+            }}
+          >
+            <Ionicons name="information-circle" size={24} color="#666" style={styles.drawerItemIcon} />
+            <Text style={styles.drawerItemText}>About Us</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {/* Custom Logout Item for both customers and handyman */}
+      <TouchableOpacity 
+        style={styles.logoutButton}
+        onPress={() => {
+          props.navigation.closeDrawer();
+          Alert.alert(
+            'Logout',
+            'Are you sure you want to logout?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'Logout', 
+                style: 'destructive',
+                onPress: logout
+              }
+            ]
+          );
+        }}
+      >
+        <Ionicons name="log-out" size={24} color="#666" style={styles.logoutIcon} />
+        <Text style={styles.logoutText}>Logout</Text>
+      </TouchableOpacity>
+    </DrawerContentScrollView>
+  );
+};
+
 // Main Drawer Navigator
 const MainDrawer = () => {
-  const { logout } = useAuth();
+  const { isHandyman } = useAuth(); // Get user and role info
   
   return (
     <Drawer.Navigator
@@ -333,19 +704,24 @@ const MainDrawer = () => {
       screenOptions={{
         headerShown: false,
         drawerActiveTintColor: Colors.primary,
-        drawerInactiveTintColor: '#666'
+        drawerInactiveTintColor: '#666',
+        drawerType: 'front'
       }}
+      drawerContent={props => <CustomDrawerContent {...props} />}
     >
+      {/* Main Tabs - This is here for navigation purposes but won't show in drawer */}
       <Drawer.Screen 
         name="MainTabs" 
         component={MainTabs} 
         options={{
-          title: 'TooKang',
+          title: isHandyman ? 'My Jobs' : 'Home',
           drawerIcon: ({ color, size }) => (
-            <Ionicons name="home" color={color} size={size} />
+            <Ionicons name={isHandyman ? "briefcase" : "home"} color={color} size={size} />
           )
         }}
       />
+      
+      {/* Payment Methods */}
       <Drawer.Screen 
         name="PaymentMethodsDrawer" 
         component={PaymentMethodsStack} 
@@ -356,6 +732,20 @@ const MainDrawer = () => {
           )
         }}
       />
+      
+      {/* Earnings - only for handyman but registered for navigation */}
+      <Drawer.Screen 
+        name="EarningsDrawer" 
+        component={TransactionHistoryStack} 
+        options={{
+          title: 'My Earnings',
+          drawerIcon: ({ color, size }) => (
+            <Ionicons name="cash" color={color} size={size} />
+          )
+        }}
+      />
+      
+      {/* Transaction History */}
       <Drawer.Screen 
         name="TransactionHistoryDrawer" 
         component={TransactionHistoryStack}
@@ -366,6 +756,8 @@ const MainDrawer = () => {
           )
         }}
       />
+      
+      {/* Help & Support */}
       <Drawer.Screen 
         name="HelpDrawer" 
         component={HelpStack}
@@ -376,6 +768,8 @@ const MainDrawer = () => {
           )
         }}
       />
+      
+      {/* Settings */}
       <Drawer.Screen 
         name="SettingsDrawer" 
         component={SettingsStack}
@@ -386,6 +780,8 @@ const MainDrawer = () => {
           )
         }}
       />
+      
+      {/* About Us */}
       <Drawer.Screen 
         name="AboutDrawer" 
         component={AboutStack}
@@ -396,40 +792,9 @@ const MainDrawer = () => {
           )
         }}
       />
-      <Drawer.Screen 
-        name="Logout" 
-        component={EmptyComponent}
-        options={{
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="log-out" color={color} size={size} />
-          )
-        }}
-        listeners={({ navigation }) => ({
-          onPress: () => {
-            // Close drawer
-            navigation.closeDrawer();
-            // Show confirmation dialog
-            Alert.alert(
-              'Logout',
-              'Are you sure you want to logout?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Logout', 
-                  style: 'destructive',
-                  onPress: logout
-                }
-              ]
-            );
-          }
-        })}
-      />
     </Drawer.Navigator>
   );
 };
-
-// Empty component for logout option
-const EmptyComponent = () => <View />;
 
 // App Navigator
 const AppNavigator = () => {
@@ -438,7 +803,7 @@ const AppNavigator = () => {
   // Show a loading screen while checking authentication
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
@@ -450,5 +815,104 @@ const AppNavigator = () => {
     </NavigationContainer>
   );
 };
+
+// Styles
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  drawerHeader: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  drawerLogo: {
+    height: 40,
+    width: 160,
+  },
+  userInfoSection: {
+    flexDirection: 'row',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+    alignItems: 'center',
+  },
+  userAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  userInfo: {
+    marginLeft: 15,
+    flex: 1,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.textDark,
+  },
+  userEmail: {
+    fontSize: 12,
+    color: Colors.textMedium,
+    marginTop: 2,
+  },
+  // Role badge styles
+  roleBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  // Header role badge
+  headerRoleBadge: {
+    backgroundColor: Colors.secondary,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginRight: 16,
+  },
+  headerRoleBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: Colors.primary,
+  },
+  // Drawer item style (for custom handyman drawer)
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  drawerItemIcon: {
+    marginRight: 32,
+  },
+  drawerItemText: {
+    fontSize: 16,
+    color: '#666666',
+  },
+  // Logout button
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginTop: 8,
+  },
+  logoutIcon: {
+    marginRight: 32,
+  },
+  logoutText: {
+    color: '#666666',
+    fontSize: 16,
+  }
+});
 
 export default AppNavigator;

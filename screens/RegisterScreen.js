@@ -9,7 +9,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  ScrollView
+  ScrollView,
+  Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -67,8 +68,11 @@ const RegisterScreen = ({ navigation }) => {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.logoContainer}>
-          <Ionicons name="construct" size={60} color={Colors.primary} />
-          <Text style={styles.logoText}>TooKang</Text>
+          <Image 
+            source={require('../assets/tookang-logo.png')} 
+            style={styles.logo}
+            resizeMode="contain"
+          />
         </View>
         
         <View style={styles.formContainer}>
@@ -208,13 +212,16 @@ const styles = StyleSheet.create({
     marginTop: 40,
     marginBottom: 20,
   },
-  logoText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: Colors.primary,
-    marginTop: 10,
+  logo: {
+    height: 120,
+    width: 120,
   },
-  // Continuing RegisterScreen.js styles
+  tagline: {
+    fontSize: 16,
+    color: '#666666',
+    marginTop: 10,
+    fontWeight: '500',
+  },
   formContainer: {
     paddingHorizontal: 30,
   },

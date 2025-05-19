@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  SafeAreaView
+  SafeAreaView,
+  Image
 } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,12 +16,17 @@ import { useAuth } from '../context/AuthContext';
 import Colors from '../constants/Colors';
 
 const MyProjectsScreen = ({ route, navigation }) => {
-  const { userType } = useAuth();
+  const { isHandyman } = useAuth();
   const [projects, setProjects] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('active');
   
-  // Get projects on component mount
+  // Different tab labels based on role
+  const tabs = isHandyman ? 
+    ['assigned', 'completed'] : 
+    ['active', 'past'];
+  
+  const [activeTab, setActiveTab] = useState(tabs[0]);
+  
   useEffect(() => {
     fetchProjects();
     
@@ -30,7 +36,6 @@ const MyProjectsScreen = ({ route, navigation }) => {
     }
   }, [route.params?.newProject]);
   
-  // Fetch projects (mock)
   const fetchProjects = () => {
     setIsLoading(true);
     
@@ -177,27 +182,45 @@ const MyProjectsScreen = ({ route, navigation }) => {
     setProjects(prevProjects => [newProject, ...prevProjects]);
   };
   
-  // Get filtered projects
+  // Get filtered projects based on active tab
   const getFilteredProjects = () => {
-    if (activeTab === 'active') {
-      return projects.filter(project => 
-        !['completed', 'cancelled', 'disputed'].includes(project.status)
-      );
+    if (isHandyman) {
+      if (activeTab === 'assigned') {
+        return projects.filter(project => 
+          !['completed', 'cancelled', 'disputed'].includes(project.status)
+        );
+      } else {
+        return projects.filter(project => 
+          ['completed', 'cancelled', 'disputed'].includes(project.status)
+        );
+      }
     } else {
-      return projects.filter(project => 
-        ['completed', 'cancelled', 'disputed'].includes(project.status)
-      );
+      // Customer view
+      if (activeTab === 'active') {
+        return projects.filter(project => 
+          !['completed', 'cancelled', 'disputed'].includes(project.status)
+        );
+      } else {
+        return projects.filter(project => 
+          ['completed', 'cancelled', 'disputed'].includes(project.status)
+        );
+      }
     }
   };
   
-  // Handle navigation to project details
+  // Handle navigation to project details - FIXED NAVIGATION
   const handleViewProject = (project) => {
-    navigation.navigate('ProjectDetails', { project });
+    console.log('Navigating to project details for:', project.title);
+    
+    // Important: Navigate with proper parameters to match ProjectDetailScreen
+    navigation.navigate('ProjectDetails', { 
+      project: project,
+      viewMode: 'normal'
+    });
   };
   
   // Handle pay now button
   const handlePayForProject = (project) => {
-    // Use CommonActions to navigate to ensure it works from any position
     navigation.dispatch(
       CommonActions.navigate({
         name: 'HomeTab',
@@ -214,7 +237,6 @@ const MyProjectsScreen = ({ route, navigation }) => {
   
   // Handle view adjustment
   const handleViewAdjustment = (project) => {
-    // Use CommonActions to navigate to ensure it works from any position
     navigation.dispatch(
       CommonActions.navigate({
         name: 'HomeTab',
@@ -240,17 +262,32 @@ const MyProjectsScreen = ({ route, navigation }) => {
   
   // Get status label
   const getStatusLabel = (status) => {
-    switch(status) {
-      case 'pending_handyman_review': return 'Pending Review';
-      case 'in_negotiation': return 'In Negotiation';
-      case 'agreed_scheduled': return 'Agreed & Scheduled';
-      case 'requires_adjustment': return 'Adjustment Needed';
-      case 'requires_payment': return 'Payment Required';
-      case 'in_progress': return 'In Progress';
-      case 'completed': return 'Completed';
-      case 'cancelled': return 'Cancelled';
-      case 'disputed': return 'Disputed';
-      default: return status;
+    if (isHandyman) {
+      switch(status) {
+        case 'pending_handyman_review': return 'New Job Request';
+        case 'in_negotiation': return 'In Discussion';
+        case 'agreed_scheduled': return 'Job Scheduled';
+        case 'requires_adjustment': return 'Budget Adjustment Sent';
+        case 'requires_payment': return 'Awaiting Payment';
+        case 'in_progress': return 'In Progress';
+        case 'completed': return 'Completed';
+        case 'cancelled': return 'Cancelled';
+        case 'disputed': return 'Disputed';
+        default: return status;
+      }
+    } else {
+      switch(status) {
+        case 'pending_handyman_review': return 'Pending Review';
+        case 'in_negotiation': return 'In Negotiation';
+        case 'agreed_scheduled': return 'Agreed & Scheduled';
+        case 'requires_adjustment': return 'Adjustment Needed';
+        case 'requires_payment': return 'Payment Required';
+        case 'in_progress': return 'In Progress';
+        case 'completed': return 'Completed';
+        case 'cancelled': return 'Cancelled';
+        case 'disputed': return 'Disputed';
+        default: return status;
+      }
     }
   };
   
@@ -270,10 +307,9 @@ const MyProjectsScreen = ({ route, navigation }) => {
     }
   };
   
-  // Render item
+  // Render project item
   const renderProjectItem = ({ item }) => {
-    const isCustomer = userType === 'customer';
-    const otherParty = isCustomer ? item.handyman : item.customer;
+    const otherParty = isHandyman ? item.customer : item.handyman;
     
     return (
       <TouchableOpacity 
@@ -293,18 +329,26 @@ const MyProjectsScreen = ({ route, navigation }) => {
         
         <Text style={styles.projectTitle}>{item.title}</Text>
         
+        {/* Location info */}
         <View style={styles.infoRow}>
           <Ionicons name="location-outline" size={16} color="#666" />
           <Text style={styles.infoText} numberOfLines={1}>{item.location}</Text>
         </View>
         
+        {/* Date info */}
         <View style={styles.infoRow}>
           <Ionicons name="calendar-outline" size={16} color="#666" />
-          <Text style={styles.infoText}>{formatDate(item.preferredDate)}</Text>
+          <Text style={styles.infoText}>
+            {isHandyman 
+              ? `Scheduled: ${formatDate(item.preferredDate)}, ${item.preferredTime}` 
+              : `Preferred: ${formatDate(item.preferredDate)}, ${item.preferredTime}`
+            }
+          </Text>
         </View>
         
+        {/* Budget display */}
         <View style={styles.budgetContainer}>
-          <Text style={styles.budgetLabel}>Budget:</Text>
+          <Text style={styles.budgetLabel}>{isHandyman ? 'Earnings:' : 'Budget:'}</Text>
           <Text style={styles.budgetAmount}>
             RM {parseFloat(item.adjustedBudget || item.agreedBudget || item.initialBudget).toFixed(2)}
           </Text>
@@ -313,42 +357,44 @@ const MyProjectsScreen = ({ route, navigation }) => {
         <View style={styles.divider} />
         
         <View style={styles.footer}>
+          {/* Other party info */}
           <View style={styles.partyInfo}>
-            <Text style={styles.partyLabel}>{isCustomer ? 'Handyman:' : 'Customer:'}</Text>
-            <Text style={styles.partyName}>{otherParty.name}</Text>
-          </View>
-          
-          {/* Action buttons for customer */}
-          {isCustomer && (
-            <View style={styles.actions}>
-              {item.status === 'requires_payment' && (
-                <TouchableOpacity 
-                  style={styles.payButton}
-                  onPress={() => handlePayForProject(item)}
-                >
-                  <Text style={styles.payButtonText}>Pay Now</Text>
-                </TouchableOpacity>
-              )}
-              
-              {item.status === 'requires_adjustment' && (
-                <TouchableOpacity 
-                  style={styles.viewButton}
-                  onPress={() => handleViewAdjustment(item)}
-                >
-                  <Text style={styles.viewButtonText}>View Adjustment</Text>
-                </TouchableOpacity>
-              )}
-              
-              {item.status === 'agreed_scheduled' && (
-                <TouchableOpacity 
-                  style={styles.payButton}
-                  onPress={() => handlePayForProject(item)}
-                >
-                  <Text style={styles.payButtonText}>Pay Now</Text>
-                </TouchableOpacity>
+            <Image 
+              source={{ uri: otherParty.avatar }} 
+              style={styles.avatarImage} 
+            />
+            <View style={styles.partyDetails}>
+              <Text style={styles.partyLabel}>{isHandyman ? 'Customer:' : 'Handyman:'}</Text>
+              <Text style={styles.partyName}>{otherParty.name}</Text>
+              {!isHandyman && otherParty.rating && (
+                <View style={styles.ratingContainer}>
+                  <Ionicons name="star" size={12} color="#FFC107" />
+                  <Text style={styles.ratingText}>{otherParty.rating}</Text>
+                </View>
               )}
             </View>
-          )}
+          </View>
+          
+          {/* Action buttons */}
+          <View style={styles.actions}>
+            {!isHandyman && item.status === 'requires_payment' && (
+              <TouchableOpacity 
+                style={styles.payButton}
+                onPress={() => handlePayForProject(item)}
+              >
+                <Text style={styles.payButtonText}>Pay Now</Text>
+              </TouchableOpacity>
+            )}
+            
+            {!isHandyman && item.status === 'requires_adjustment' && (
+              <TouchableOpacity 
+                style={styles.viewButton}
+                onPress={() => handleViewAdjustment(item)}
+              >
+                <Text style={styles.viewButtonText}>View Adjustment</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -361,35 +407,41 @@ const MyProjectsScreen = ({ route, navigation }) => {
         <TouchableOpacity
           style={[
             styles.tab,
-            activeTab === 'active' && styles.activeTab
+            activeTab === tabs[0] && styles.activeTab
           ]}
-          onPress={() => setActiveTab('active')}
+          onPress={() => setActiveTab(tabs[0])}
         >
           <Text style={[
             styles.tabText,
-            activeTab === 'active' && styles.activeTabText
-          ]}>Active</Text>
+            activeTab === tabs[0] && styles.activeTabText
+          ]}>
+            {isHandyman ? 'Assigned Jobs' : 'Active Projects'}
+          </Text>
         </TouchableOpacity>
         
         <TouchableOpacity
           style={[
             styles.tab,
-            activeTab === 'past' && styles.activeTab
+            activeTab === tabs[1] && styles.activeTab
           ]}
-          onPress={() => setActiveTab('past')}
+          onPress={() => setActiveTab(tabs[1])}
         >
           <Text style={[
             styles.tabText,
-            activeTab === 'past' && styles.activeTabText
-          ]}>Past</Text>
+            activeTab === tabs[1] && styles.activeTabText
+          ]}>
+            {isHandyman ? 'Job History' : 'Past Projects'}
+          </Text>
         </TouchableOpacity>
       </View>
       
-      {/* Projects List */}
+      {/* Projects/Jobs List */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Loading projects...</Text>
+          <Text style={styles.loadingText}>
+            {isHandyman ? 'Loading jobs...' : 'Loading projects...'}
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -400,30 +452,31 @@ const MyProjectsScreen = ({ route, navigation }) => {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
-              <Ionicons name="construct-outline" size={64} color="#DDD" />
-              <Text style={styles.emptyTitle}>No Projects Found</Text>
+              <Ionicons 
+                name={isHandyman ? "briefcase-outline" : "construct-outline"} 
+                size={64} 
+                color="#DDD" 
+              />
+              <Text style={styles.emptyTitle}>
+                {isHandyman ? 'No Jobs Found' : 'No Projects Found'}
+              </Text>
               <Text style={styles.emptyText}>
-                {activeTab === 'active' 
-                  ? 'You don\'t have any active projects' 
-                  : 'You don\'t have any past projects'
+                {isHandyman 
+                  ? (activeTab === 'assigned' 
+                      ? 'You don\'t have any assigned jobs yet' 
+                      : 'You don\'t have any completed jobs')
+                  : (activeTab === 'active' 
+                      ? 'You don\'t have any active projects' 
+                      : 'You don\'t have any past projects')
                 }
               </Text>
-              
-              {userType === 'customer' && activeTab === 'active' && (
-                <TouchableOpacity
-                  style={styles.createButton}
-                  onPress={() => navigation.navigate('HomeTab')}
-                >
-                  <Text style={styles.createButtonText}>Find a Handyman</Text>
-                </TouchableOpacity>
-              )}
             </View>
           )}
         />
       )}
       
-      {/* Create New Project Button (for customers) */}
-      {userType === 'customer' && activeTab === 'active' && !isLoading && getFilteredProjects().length > 0 && (
+      {/* Create New Project Button (for customers only) */}
+      {!isHandyman && activeTab === 'active' && !isLoading && (
         <TouchableOpacity
           style={styles.floatingButton}
           onPress={() => navigation.navigate('HomeTab')}
@@ -459,7 +512,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.primary,
   },
   tabText: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#666',
   },
   activeTabText: {
@@ -552,18 +605,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  avatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 8,
+  },
+  partyDetails: {
+    flexDirection: 'column',
+  },
   partyLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
-    marginRight: 4,
   },
   partyName: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
   },
-  actions: {
+  ratingContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  ratingText: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 2,
+  },
+  actions: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
   },
   payButton: {
     backgroundColor: Colors.primary,
@@ -588,8 +660,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   loadingContainer: {
-    flex:
-     1,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -613,17 +684,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginBottom: 24,
-  },
-  createButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  createButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   floatingButton: {
     position: 'absolute',

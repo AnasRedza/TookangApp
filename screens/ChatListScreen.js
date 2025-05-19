@@ -12,17 +12,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import Colors from '../constants/Colors';
 
-// Mock data for conversation list
-const MOCK_CONVERSATIONS = [
+// Mock data for conversation list - CUSTOMER VIEW
+const CUSTOMER_CONVERSATIONS = [
   {
     id: '1',
     name: 'John the Plumber',
     avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
-    lastMessage: 'Okay, I understand. I will bring the necessary tools and parts to fix a bathroom sink pipe. See you tomorrow at 10am!',
-    timestamp: new Date(Date.now() - 61200000).toISOString(), // 17 hours ago
+    lastMessage: 'I will bring the necessary tools tomorrow at 10am.',
+    timestamp: new Date(Date.now() - 61200000).toISOString(),
     unread: 0,
-    userType: 'handyman',
-    service: 'Plumbing',
     project: 'Bathroom Sink Repair',
   },
   {
@@ -30,83 +28,57 @@ const MOCK_CONVERSATIONS = [
     name: 'Sarah Williams',
     avatar: 'https://randomuser.me/api/portraits/women/2.jpg',
     lastMessage: "I've finished painting the living room. Let me know what you think!",
-    timestamp: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+    timestamp: new Date(Date.now() - 3600000).toISOString(),
     unread: 2,
-    userType: 'handyman',
-    service: 'Painting',
     project: 'Living Room Renovation',
   },
   {
     id: '3',
     name: 'Michael Chen',
     avatar: 'https://randomuser.me/api/portraits/men/3.jpg',
-    lastMessage: 'The ceiling fan installation is complete. Here are some care instructions.',
-    timestamp: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    lastMessage: 'The ceiling fan installation is complete.',
+    timestamp: new Date(Date.now() - 86400000).toISOString(),
     unread: 0,
-    userType: 'handyman',
-    service: 'Electrical',
     project: 'Ceiling Fan Installation',
-  },
-  {
-    id: '4',
-    name: 'Jennifer Lopez',
-    avatar: 'https://randomuser.me/api/portraits/women/4.jpg',
-    lastMessage: 'Your garden looks beautiful now. I\'ve left some plant care tips in your mailbox.',
-    timestamp: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-    unread: 0,
-    userType: 'handyman',
-    service: 'Landscaping',
-    project: 'Garden Maintenance',
-  },
-  {
-    id: '5',
-    name: 'David Lee',
-    avatar: 'https://randomuser.me/api/portraits/men/5.jpg',
-    lastMessage: 'I\'ll be arriving at 9am tomorrow to fix your AC unit.',
-    timestamp: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
-    unread: 1,
-    userType: 'handyman',
-    service: 'HVAC',
-    project: 'AC Repair',
   },
 ];
 
+// Mock data for conversation list - HANDYMAN VIEW
 const HANDYMAN_CONVERSATIONS = [
   {
     id: '1',
     name: 'Sarah Johnson',
     avatar: 'https://randomuser.me/api/portraits/women/6.jpg',
-    lastMessage: 'Okay, I understand. I will bring the necessary tools and parts to fix a bathroom sink pipe. See you tomorrow at 10am!',
-    timestamp: new Date(Date.now() - 61200000).toISOString(), // 17 hours ago
+    lastMessage: 'What time can you arrive tomorrow to fix my bathroom sink?',
+    timestamp: new Date(Date.now() - 61200000).toISOString(),
     unread: 0,
-    userType: 'customer',
     project: 'Bathroom Sink Repair',
+    isNewRequest: false,
   },
   {
     id: '2',
     name: 'James Wilson',
     avatar: 'https://randomuser.me/api/portraits/men/7.jpg',
-    lastMessage: 'Thanks for your quote. When can you start the kitchen renovation?',
-    timestamp: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+    lastMessage: 'When can you start the kitchen renovation?',
+    timestamp: new Date(Date.now() - 3600000).toISOString(),
     unread: 3,
-    userType: 'customer',
     project: 'Kitchen Renovation',
+    isNewRequest: true,
   },
   {
     id: '3',
     name: 'Emily Rodriguez',
     avatar: 'https://randomuser.me/api/portraits/women/8.jpg',
     lastMessage: 'Could you bring some paint samples next time?',
-    timestamp: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    timestamp: new Date(Date.now() - 86400000).toISOString(),
     unread: 0,
-    userType: 'customer',
     project: 'Living Room Painting',
   },
 ];
 
 const ChatListScreen = ({ navigation }) => {
-  const { userType } = useAuth();
-  const conversations = userType === 'customer' ? MOCK_CONVERSATIONS : HANDYMAN_CONVERSATIONS;
+  const { isHandyman } = useAuth();
+  const conversations = isHandyman ? HANDYMAN_CONVERSATIONS : CUSTOMER_CONVERSATIONS;
 
   const formatTimestamp = (timestamp) => {
     const messageDate = new Date(timestamp);
@@ -115,17 +87,10 @@ const ChatListScreen = ({ navigation }) => {
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     
     if (diffDays === 0) {
-      // Today - show time
       return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else if (diffDays === 1) {
-      // Yesterday
       return 'Yesterday';
-    } else if (diffDays < 7) {
-      // Last week - show day name
-      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      return days[messageDate.getDay()];
     } else {
-      // Older - show date
       return messageDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
   };
@@ -136,16 +101,14 @@ const ChatListScreen = ({ navigation }) => {
         id: conversation.id,
         name: conversation.name,
         avatar: conversation.avatar,
-        lastSeen: 'Online now',
-        service: conversation.service,
-        project: conversation.project,
+        project: conversation.project
       } 
     });
   };
-
-  const renderItem = ({ item }) => (
+  
+  const renderConversationItem = ({ item }) => (
     <TouchableOpacity 
-      style={styles.conversationItem}
+      style={[styles.conversationItem, item.isNewRequest && styles.newRequestItem]}
       onPress={() => navigateToChat(item)}
     >
       <View style={styles.avatarContainer}>
@@ -163,9 +126,7 @@ const ChatListScreen = ({ navigation }) => {
           <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
         </View>
         
-        <Text style={styles.projectName}>
-          {item.project}
-        </Text>
+        <Text style={styles.projectName}>{item.project}</Text>
         
         <Text 
           style={[styles.lastMessage, item.unread > 0 && styles.unreadMessage]}
@@ -175,27 +136,29 @@ const ChatListScreen = ({ navigation }) => {
           {item.lastMessage}
         </Text>
       </View>
+      
+      {isHandyman && item.isNewRequest && (
+        <View style={styles.newRequestIndicator}>
+          <Text style={styles.newRequestText}>NEW</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Conversation List */}
-      {conversations.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubbles-outline" size={50} color="#CCC" />
-          <Text style={styles.emptyTitle}>No Messages</Text>
-          <Text style={styles.emptyText}>
-            You don't have any conversations yet
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={conversations}
-          renderItem={renderItem}
-          keyExtractor={item => item.id}
-        />
-      )}
+      <FlatList
+        data={conversations}
+        renderItem={renderConversationItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.listContainer}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="chatbubbles-outline" size={50} color="#CCC" />
+            <Text style={styles.emptyText}>No messages yet</Text>
+          </View>
+        )}
+      />
     </SafeAreaView>
   );
 };
@@ -205,12 +168,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  listContainer: {
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
   conversationItem: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#F5F5F5',
+  },
+  newRequestItem: {
+    backgroundColor: '#FFFDE7',
   },
   avatarContainer: {
     position: 'relative',
@@ -225,7 +195,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: -2,
     top: -2,
-    backgroundColor: Colors.primary || '#3498db',
+    backgroundColor: Colors.primary,
     borderRadius: 10,
     minWidth: 18,
     height: 18,
@@ -246,7 +216,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   name: {
     fontSize: 16,
@@ -259,35 +229,42 @@ const styles = StyleSheet.create({
   },
   projectName: {
     fontSize: 13,
-    color: Colors.primary || '#3498db',
+    color: Colors.primary,
+    fontWeight: '500',
     marginBottom: 4,
   },
   lastMessage: {
     fontSize: 14,
     color: '#777',
-    lineHeight: 20,
   },
   unreadMessage: {
     fontWeight: '600',
     color: '#333',
   },
+  newRequestIndicator: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    alignSelf: 'center',
+    marginLeft: 8,
+  },
+  newRequestText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 16,
-    marginBottom: 8,
+    padding: 30,
+    marginTop: 80,
   },
   emptyText: {
     fontSize: 14,
     color: '#999',
-    textAlign: 'center',
+    marginTop: 16,
   }
 });
 

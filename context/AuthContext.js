@@ -1,100 +1,138 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Create the AuthContext
+// Create the context
 const AuthContext = createContext();
 
-// AuthProvider component
+// Create a provider component
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for stored user on app load
+  // Check for stored user on mount
   useEffect(() => {
-    checkUserLoggedIn();
+    const checkUser = async () => {
+      try {
+        const userData = await AsyncStorage.getItem('user');
+        if (userData) {
+          setUser(JSON.parse(userData));
+        }
+      } catch (error) {
+        console.log('Error restoring user session:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkUser();
   }, []);
 
-  // Function to check if user is logged in
-  const checkUserLoggedIn = async () => {
+  // Login function - now accepts role parameter directly
+  const login = async (email, password, role = 'customer') => {
+    setIsLoading(true);
+    
     try {
-      const storedUser = await AsyncStorage.getItem('user');
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
-    } catch (error) {
-      console.log('Error checking for user:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Login function
-  const login = async (email, password) => {
-    try {
-      // Here you'd typically make an API call to your backend
-      // For now, we'll simulate a successful login
-      const userDetails = { id: '1', email, userType: 'customer', name: 'Test User' };
+      // Simulate API call to authentication service
+      // In a real app, this would be an actual API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Store user details in AsyncStorage
-      await AsyncStorage.setItem('user', JSON.stringify(userDetails));
+      // For demo purposes, create a user with the specified role
+      const userData = {
+        id: 'user-' + Math.floor(Math.random() * 1000),
+        email,
+        name: email.split('@')[0], // Extract name from email
+        role: role, // Use the passed role directly
+        // Add other user data
+        avatar: `https://randomuser.me/api/portraits/${role === 'handyman' ? 'men' : 'women'}/${Math.floor(Math.random() * 50)}.jpg`
+      };
+      
+      console.log('Logging in with role:', role);
+      
+      // Save to storage
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
       
       // Update state
-      setUser(userDetails);
+      setUser(userData);
+      setIsLoading(false);
+      
       return { success: true };
     } catch (error) {
       console.log('Login error:', error);
-      return { success: false, error: error.message || 'Login failed' };
+      setIsLoading(false);
+      return { 
+        success: false, 
+        error: 'Authentication failed. Please try again.' 
+      };
     }
   };
 
   // Logout function
   const logout = async () => {
     try {
-      // Remove user from AsyncStorage
       await AsyncStorage.removeItem('user');
-      // Update state
       setUser(null);
     } catch (error) {
       console.log('Logout error:', error);
     }
   };
 
-  // Register function
-  const register = async (name, email, password, userType = 'customer') => {
+  // Register function with direct role parameter
+  const register = async (name, email, password, role = 'customer') => {
+    setIsLoading(true);
+    
     try {
-      // Here you'd typically make an API call to your backend
-      // For now, we'll simulate a successful registration
-      const userDetails = { id: '1', name, email, userType };
+      // Simulate API call to registration service
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Store user details in AsyncStorage
-      await AsyncStorage.setItem('user', JSON.stringify(userDetails));
+      // For demo purposes, create a user with specified role
+      const userData = {
+        id: 'user-' + Math.floor(Math.random() * 1000),
+        name,
+        email,
+        role: role,
+        avatar: `https://randomuser.me/api/portraits/${role === 'handyman' ? 'men' : 'women'}/${Math.floor(Math.random() * 50)}.jpg`
+      };
+      
+      console.log('Registering with role:', role);
+      
+      // Save to storage
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
       
       // Update state
-      setUser(userDetails);
+      setUser(userData);
+      setIsLoading(false);
+      
       return { success: true };
     } catch (error) {
       console.log('Registration error:', error);
-      return { success: false, error: error.message || 'Registration failed' };
+      setIsLoading(false);
+      return { 
+        success: false, 
+        error: 'Registration failed. Please try again.' 
+      };
     }
   };
 
+  // Values provided to consumers of this context
+  const authContextValue = {
+    user,
+    isLoading,
+    login,
+    logout,
+    register,
+    isHandyman: user?.role === 'handyman',
+    isCustomer: user?.role === 'customer',
+    userRole: user?.role || 'customer',
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        login,
-        logout,
-        register,
-        userType: user?.userType || 'customer' // Default to customer if not specified
-      }}
-    >
+    <AuthContext.Provider value={authContextValue}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-// Custom hook to use the AuthContext
+// Custom hook for using the auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -102,3 +140,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+export default AuthContext;
