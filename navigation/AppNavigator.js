@@ -7,6 +7,7 @@ import { createDrawerNavigator, DrawerContentScrollView } from '@react-navigatio
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import Colors from '../constants/Colors';
+import { getUserDisplayInfo, getRoleNavigationOptions } from '../utils/authUtils';
 
 // Auth Screens
 import LoginScreen from '../screens/LoginScreen';
@@ -491,6 +492,7 @@ const AboutStack = () => {
 // Main Tab Navigator
 const MainTabs = () => {
   const { isHandyman } = useAuth(); // Get role info
+  const roleOptions = getRoleNavigationOptions(isHandyman ? 'handyman' : 'customer');
   
   return (
     <Tab.Navigator
@@ -520,14 +522,14 @@ const MainTabs = () => {
         name="HomeTab" 
         component={HomeStack} 
         options={{ 
-          title: isHandyman ? 'Available Jobs' : 'Home'
+          title: roleOptions.homeTabTitle
         }} 
       />
       <Tab.Screen 
         name="ProjectsTab"
         component={ProjectsStack} 
         options={{ 
-          title: isHandyman ? 'My Jobs' : 'My Projects' 
+          title: roleOptions.projectsTabTitle
         }} 
       />
       <Tab.Screen name="ChatTab" component={ChatStack} options={{ title: 'Messages' }} />
@@ -539,6 +541,7 @@ const MainTabs = () => {
 // Custom Drawer Content Component
 const CustomDrawerContent = (props) => {
   const { logout, user, isHandyman } = useAuth();
+  const userDisplayInfo = getUserDisplayInfo(user);
   
   return (
     <DrawerContentScrollView {...props}>
@@ -549,6 +552,25 @@ const CustomDrawerContent = (props) => {
           style={styles.drawerLogo}
           resizeMode="contain"
         />
+        
+        {/* User Info Section */}
+        {userDisplayInfo && (
+          <View style={styles.userInfoSection}>
+            <View style={styles.userAvatar}>
+              <Text style={styles.userAvatarText}>{userDisplayInfo.initials}</Text>
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>{userDisplayInfo.name}</Text>
+              <Text style={styles.userEmail}>{userDisplayInfo.email}</Text>
+              <View style={[
+                styles.roleBadge,
+                { backgroundColor: isHandyman ? Colors.handyman : Colors.primary }
+              ]}>
+                <Text style={styles.roleBadgeText}>{userDisplayInfo.roleDisplay}</Text>
+              </View>
+            </View>
+          </View>
+        )}
       </View>
       
       {/* Custom drawer items based on user type */}
@@ -805,6 +827,7 @@ const AppNavigator = () => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
   }
@@ -822,6 +845,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: Colors.textMedium,
   },
   drawerHeader: {
     padding: 16,
@@ -833,18 +862,27 @@ const styles = StyleSheet.create({
   drawerLogo: {
     height: 40,
     width: 160,
+    marginBottom: 16,
   },
   userInfoSection: {
     flexDirection: 'row',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
+    paddingHorizontal: 16,
+    paddingTop: 16,
     alignItems: 'center',
+    alignSelf: 'stretch',
   },
   userAvatar: {
     width: 50,
     height: 50,
     borderRadius: 25,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   userInfo: {
     marginLeft: 15,
@@ -871,6 +909,7 @@ const styles = StyleSheet.create({
   roleBadgeText: {
     fontSize: 10,
     fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   // Header role badge
   headerRoleBadge: {
@@ -905,6 +944,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#EEEEEE',
   },
   logoutIcon: {
     marginRight: 32,

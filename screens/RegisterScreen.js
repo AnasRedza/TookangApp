@@ -25,11 +25,49 @@ const RegisterScreen = ({ navigation }) => {
   const [userType, setUserType] = useState('customer'); // 'customer' or 'handyman'
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePassword = (password) => {
+    // At least 6 characters
+    return password.length >= 6;
+  };
+
+  const validateName = (name) => {
+    // At least 2 characters, only letters and spaces
+    const nameRegex = /^[a-zA-Z\s]{2,}$/;
+    return nameRegex.test(name.trim());
+  };
 
   const handleRegister = async () => {
     // Basic validation
-    if (!name || !email || !password || !confirmPassword) {
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim().toLowerCase();
+    
+    if (!trimmedName || !trimmedEmail || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+    
+    // Name validation
+    if (!validateName(trimmedName)) {
+      Alert.alert('Error', 'Please enter a valid name (at least 2 characters, letters only)');
+      return;
+    }
+    
+    // Email validation
+    if (!validateEmail(trimmedEmail)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+    
+    // Password validation
+    if (!validatePassword(password)) {
+      Alert.alert('Error', 'Password must be at least 6 characters long');
       return;
     }
     
@@ -37,25 +75,25 @@ const RegisterScreen = ({ navigation }) => {
       Alert.alert('Error', 'Passwords do not match');
       return;
     }
-    
-    // Simple email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
-    }
 
     setIsLoading(true);
     
     try {
-      const result = await register(name, email, password, userType);
+      const result = await register(trimmedName, trimmedEmail, password, userType);
       
       if (!result.success) {
         Alert.alert('Registration Failed', result.error || 'Please try again');
+      } else {
+        // Success will be handled by the auth state change
+        Alert.alert(
+          'Registration Successful',
+          `Welcome to TooKang! Your ${userType} account has been created successfully.`,
+          [{ text: 'OK' }]
+        );
       }
     } catch (error) {
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
-      console.log(error);
+      console.error('Registration error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -85,14 +123,28 @@ const RegisterScreen = ({ navigation }) => {
                 userType === 'customer' && styles.activeUserTypeButton
               ]}
               onPress={() => setUserType('customer')}
+              disabled={isLoading}
             >
-              <Text
-                style={[
-                  styles.userTypeText,
-                  userType === 'customer' && styles.activeUserTypeText
-                ]}
-              >
-                Customer
+              <View style={styles.userTypeContent}>
+                <Ionicons 
+                  name="person-outline" 
+                  size={20} 
+                  color={userType === 'customer' ? '#FFFFFF' : '#666666'} 
+                />
+                <Text
+                  style={[
+                    styles.userTypeText,
+                    userType === 'customer' && styles.activeUserTypeText
+                  ]}
+                >
+                  Customer
+                </Text>
+              </View>
+              <Text style={[
+                styles.userTypeDescription,
+                userType === 'customer' && styles.activeUserTypeDescription
+              ]}>
+                Need services
               </Text>
             </TouchableOpacity>
             
@@ -102,14 +154,28 @@ const RegisterScreen = ({ navigation }) => {
                 userType === 'handyman' && styles.activeUserTypeButton
               ]}
               onPress={() => setUserType('handyman')}
+              disabled={isLoading}
             >
-              <Text
-                style={[
-                  styles.userTypeText,
-                  userType === 'handyman' && styles.activeUserTypeText
-                ]}
-              >
-                Handyman
+              <View style={styles.userTypeContent}>
+                <Ionicons 
+                  name="build-outline" 
+                  size={20} 
+                  color={userType === 'handyman' ? '#FFFFFF' : '#666666'} 
+                />
+                <Text
+                  style={[
+                    styles.userTypeText,
+                    userType === 'handyman' && styles.activeUserTypeText
+                  ]}
+                >
+                  Handyman
+                </Text>
+              </View>
+              <Text style={[
+                styles.userTypeDescription,
+                userType === 'handyman' && styles.activeUserTypeDescription
+              ]}>
+                Provide services
               </Text>
             </TouchableOpacity>
           </View>
@@ -121,6 +187,8 @@ const RegisterScreen = ({ navigation }) => {
               placeholder="Full Name"
               value={name}
               onChangeText={setName}
+              autoCapitalize="words"
+              autoCorrect={false}
             />
           </View>
           
@@ -133,6 +201,7 @@ const RegisterScreen = ({ navigation }) => {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
             />
           </View>
           
@@ -140,10 +209,12 @@ const RegisterScreen = ({ navigation }) => {
             <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Password"
+              placeholder="Password (min. 6 characters)"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
             />
             <TouchableOpacity 
               style={styles.eyeIcon} 
@@ -164,17 +235,32 @@ const RegisterScreen = ({ navigation }) => {
               placeholder="Confirm Password"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
-              secureTextEntry={!showPassword}
+              secureTextEntry={!showConfirmPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
             />
+            <TouchableOpacity 
+              style={styles.eyeIcon} 
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              <Ionicons 
+                name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} 
+                size={20} 
+                color="#999" 
+              />
+            </TouchableOpacity>
           </View>
           
           <TouchableOpacity 
-            style={styles.registerButton}
+            style={[styles.registerButton, isLoading && styles.disabledButton]}
             onPress={handleRegister}
             disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color="#FFFFFF" size="small" />
+                <Text style={styles.loadingText}>Creating account...</Text>
+              </View>
             ) : (
               <Text style={styles.registerButtonText}>Create Account</Text>
             )}
@@ -189,6 +275,7 @@ const RegisterScreen = ({ navigation }) => {
           <TouchableOpacity 
             style={styles.loginButton}
             onPress={() => navigation.navigate('Login')}
+            disabled={isLoading}
           >
             <Text style={styles.loginButtonText}>Already have an account? Sign In</Text>
           </TouchableOpacity>
@@ -216,12 +303,6 @@ const styles = StyleSheet.create({
     height: 120,
     width: 120,
   },
-  tagline: {
-    fontSize: 16,
-    color: '#666666',
-    marginTop: 10,
-    fontWeight: '500',
-  },
   formContainer: {
     paddingHorizontal: 30,
   },
@@ -236,23 +317,40 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     borderRadius: 8,
     marginBottom: 20,
+    padding: 4,
   },
   userTypeButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 6,
+    marginHorizontal: 2,
   },
   activeUserTypeButton: {
     backgroundColor: Colors.primary,
+  },
+  userTypeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   userTypeText: {
     fontSize: 16,
     color: '#666666',
     fontWeight: '600',
+    marginLeft: 6,
   },
   activeUserTypeText: {
     color: '#FFFFFF',
+  },
+  userTypeDescription: {
+    fontSize: 12,
+    color: '#999999',
+    textAlign: 'center',
+  },
+  activeUserTypeDescription: {
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -285,10 +383,23 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 20,
   },
+  disabledButton: {
+    backgroundColor: '#CCCCCC',
+  },
   registerButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   divider: {
     flexDirection: 'row',

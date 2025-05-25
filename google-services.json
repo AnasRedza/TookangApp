@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "84462197873",
+    "project_id": "tookang-app",
+    "storage_bucket": "tookang-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:84462197873:android:54b11df19356bf96364fd0",
+        "android_client_info": {
+          "package_name": "com.anasiman.tookang"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDtluVpzE-1hbJXAM1Ajny0JcLLt-6vr2c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

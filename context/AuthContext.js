@@ -1,125 +1,218 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { auth, db } from '../firebase';
 
-// Create the context
 const AuthContext = createContext();
 
-// Create a provider component
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for stored user on mount
   useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const userData = await AsyncStorage.getItem('user');
-        if (userData) {
-          setUser(JSON.parse(userData));
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          // Try to get user data from Firestore
+          const userDoc = await db.collection('users').doc(firebaseUser.uid).get();
+          
+          let userData;
+          if (userDoc.exists) {
+            userData = {
+              id: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName,
+              ...userDoc.data()
+            };
+          } else {
+            // If no user document exists, sign out the user
+            await auth.signOut();
+            setUser(null);
+            await AsyncStorage.removeItem('user');
+            setIsLoading(false);
+            return;
+          }
+          
+          setUser(userData);
+          await AsyncStorage.setItem('user', JSON.stringify(userData));
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+          // If there's an error fetching user data, sign out
+          await auth.signOut();
+          setUser(null);
+          await AsyncStorage.removeItem('user');
         }
-      } catch (error) {
-        console.log('Error restoring user session:', error);
-      } finally {
-        setIsLoading(false);
+      } else {
+        setUser(null);
+        await AsyncStorage.removeItem('user');
       }
-    };
+      setIsLoading(false);
+    });
 
-    checkUser();
+    return () => unsubscribe();
   }, []);
 
-  // Login function - now accepts role parameter directly
-  const login = async (email, password, role = 'customer') => {
-    setIsLoading(true);
-    
+  const login = async (email, password, selectedRole) => {
     try {
-      // Simulate API call to authentication service
-      // In a real app, this would be an actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // First, authenticate with Firebase
+      const userCredential = await auth.signInWithEmailAndPassword(email, password);
+      const firebaseUser = userCredential.user;
       
-      // For demo purposes, create a user with the specified role
-      const userData = {
-        id: 'user-' + Math.floor(Math.random() * 1000),
-        email,
-        name: email.split('@')[0], // Extract name from email
-        role: role, // Use the passed role directly
-        // Add other user data
-        avatar: `https://randomuser.me/api/portraits/${role === 'handyman' ? 'men' : 'women'}/${Math.floor(Math.random() * 50)}.jpg`
-      };
+      // Get user data from Firestore to check their actual role
+      const userDoc = await db.collection('users').doc(firebaseUser.uid).get();
       
-      console.log('Logging in with role:', role);
+      if (!userDoc.exists) {
+        // No user document found - this shouldn't happen for registered users
+        await auth.signOut();
+        return { 
+          success: false, 
+          error: 'User profile not found. Please contact support.' 
+        };
+      }
       
-      // Save to storage
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
+      const userData = userDoc.data();
       
-      // Update state
-      setUser(userData);
-      setIsLoading(false);
+      // Check if the selected role matches the user's actual role
+      if (userData.role !== selectedRole) {
+        await auth.signOut();
+        
+        // Provide specific error message based on the mismatch
+        const userRoleDisplay = userData.role.charAt(0).toUpperCase() + userData.role.slice(1);
+        const selectedRoleDisplay = selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1);
+        
+        return { 
+          success: false, 
+          error: `This account is registered as a ${userRoleDisplay}, but you selected ${selectedRoleDisplay}. Please select the correct account type.` 
+        };
+      }
       
+      // If everything is valid, the auth state change will handle setting the user
       return { success: true };
+      
     } catch (error) {
-      console.log('Login error:', error);
-      setIsLoading(false);
-      return { 
-        success: false, 
-        error: 'Authentication failed. Please try again.' 
-      };
+      let errorMessage = 'Authentication failed. Please try again.';
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email address.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed login attempts. Please try again later.';
+      } else if (error.code === 'auth/invalid-credential') {
+        errorMessage = 'Invalid credentials. Please check your email and password.';
+      }
+      return { success: false, error: errorMessage };
     }
   };
 
-  // Logout function
+  const register = async (name, email, password, role = 'customer') => {
+    try {
+      // Check if a user with this email and role combination already exists
+      const existingUsersQuery = await db.collection('users')
+        .where('email', '==', email.toLowerCase())
+        .get();
+      
+      if (!existingUsersQuery.empty) {
+        const existingUser = existingUsersQuery.docs[0].data();
+        return { 
+          success: false, 
+          error: `An account with this email already exists as a ${existingUser.role.charAt(0).toUpperCase() + existingUser.role.slice(1)}.` 
+        };
+      }
+
+      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+      const firebaseUser = userCredential.user;
+      
+      // Update profile
+      await firebaseUser.updateProfile({
+        displayName: name
+      });
+      
+      // Create user document in Firestore
+      const userData = {
+        name: name.trim(),
+        email: firebaseUser.email.toLowerCase(),
+        role: role,
+        createdAt: new Date().toISOString(),
+        isActive: true,
+        profileComplete: false
+      };
+      
+      await db.collection('users').doc(firebaseUser.uid).set(userData);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Registration error:', error);
+      let errorMessage = 'Registration failed. Please try again.';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'An account with this email already exists.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password is too weak. Please choose a stronger password (minimum 6 characters).';
+      } else if (error.code === 'auth/operation-not-allowed') {
+        errorMessage = 'Email/password accounts are not enabled. Please contact support.';
+      }
+      return { success: false, error: errorMessage };
+    }
+  };
+
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem('user');
-      setUser(null);
+      await auth.signOut();
     } catch (error) {
-      console.log('Logout error:', error);
+      console.error('Logout error:', error);
     }
   };
 
-  // Register function with direct role parameter
-  const register = async (name, email, password, role = 'customer') => {
-    setIsLoading(true);
-    
+  const forgotPassword = async (email) => {
     try {
-      // Simulate API call to registration service
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // For demo purposes, create a user with specified role
-      const userData = {
-        id: 'user-' + Math.floor(Math.random() * 1000),
-        name,
-        email,
-        role: role,
-        avatar: `https://randomuser.me/api/portraits/${role === 'handyman' ? 'men' : 'women'}/${Math.floor(Math.random() * 50)}.jpg`
+      await auth.sendPasswordResetEmail(email);
+      return { 
+        success: true, 
+        message: 'Password reset email sent. Please check your inbox.' 
       };
+    } catch (error) {
+      let errorMessage = 'Failed to send password reset email.';
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email address.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      }
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  // Helper function to update user profile
+  const updateUserProfile = async (updates) => {
+    try {
+      if (!user) return { success: false, error: 'No user logged in' };
       
-      console.log('Registering with role:', role);
+      await db.collection('users').doc(user.id).update({
+        ...updates,
+        updatedAt: new Date().toISOString()
+      });
       
-      // Save to storage
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
-      
-      // Update state
-      setUser(userData);
-      setIsLoading(false);
+      // Update local user state
+      const updatedUser = { ...user, ...updates };
+      setUser(updatedUser);
+      await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
       
       return { success: true };
     } catch (error) {
-      console.log('Registration error:', error);
-      setIsLoading(false);
-      return { 
-        success: false, 
-        error: 'Registration failed. Please try again.' 
-      };
+      console.error('Profile update error:', error);
+      return { success: false, error: 'Failed to update profile' };
     }
   };
 
-  // Values provided to consumers of this context
   const authContextValue = {
     user,
     isLoading,
     login,
     logout,
     register,
+    forgotPassword,
+    updateUserProfile,
     isHandyman: user?.role === 'handyman',
     isCustomer: user?.role === 'customer',
     userRole: user?.role || 'customer',
@@ -132,7 +225,6 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// Custom hook for using the auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {

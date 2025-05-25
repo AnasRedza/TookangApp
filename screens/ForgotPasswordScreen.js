@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,37 +9,74 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  ScrollView
+  ScrollView,
+  Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 import Colors from '../constants/Colors';
 
-const ForgotPasswordScreen = ({ navigation }) => {
+const ForgotPasswordScreen = ({ navigation, route }) => {
+  const { forgotPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
-  const handleResetPassword = () => {
-    // Basic validation
-    if (!email) {
+  // Pre-fill email if passed from LoginScreen
+  useEffect(() => {
+    if (route.params?.email) {
+      setEmail(route.params.email);
+    }
+  }, [route.params]);
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleForgotPassword = async () => {
+    const trimmedEmail = email.trim().toLowerCase();
+    
+    if (!trimmedEmail) {
       Alert.alert('Error', 'Please enter your email address');
       return;
     }
-    
-    // Simple email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+
+    if (!validateEmail(trimmedEmail)) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
     setIsLoading(true);
     
-    // Simulate API call for password reset
-    setTimeout(() => {
+    try {
+      const result = await forgotPassword(trimmedEmail);
+      
+      if (result.success) {
+        setEmailSent(true);
+        Alert.alert(
+          'Email Sent',
+          result.message,
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('Login')
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Error', result.error);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      console.error('Forgot password error:', error);
+    } finally {
       setIsLoading(false);
-      setResetSent(true);
-    }, 1500);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    await handleForgotPassword();
   };
 
   return (
@@ -48,18 +85,28 @@ const ForgotPasswordScreen = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="lock-open-outline" size={80} color={Colors.primary} />
+        <View style={styles.logoContainer}>
+          <Image 
+            source={require('../assets/tookang-logo.png')} 
+            style={styles.logo}
+            resizeMode="contain"
+          />
         </View>
         
         <View style={styles.formContainer}>
-          {!resetSent ? (
+          <View style={styles.headerContainer}>
+            <Ionicons name="mail-outline" size={60} color={Colors.primary} />
+            <Text style={styles.formTitle}>Forgot Password?</Text>
+            <Text style={styles.subtitle}>
+              {emailSent 
+                ? "We've sent password reset instructions to your email"
+                : "Enter your email address and we'll send you instructions to reset your password"
+              }
+            </Text>
+          </View>
+          
+          {!emailSent && (
             <>
-              <Text style={styles.formTitle}>Reset Password</Text>
-              <Text style={styles.formDescription}>
-                Enter your email address and we'll send you instructions to reset your password.
-              </Text>
-              
               <View style={styles.inputContainer}>
                 <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
                 <TextInput
@@ -69,36 +116,65 @@ const ForgotPasswordScreen = ({ navigation }) => {
                   onChangeText={setEmail}
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!isLoading}
                 />
               </View>
               
               <TouchableOpacity 
-                style={styles.resetButton}
-                onPress={handleResetPassword}
+                style={[styles.resetButton, isLoading && styles.disabledButton]}
+                onPress={handleForgotPassword}
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <Text style={styles.loadingText}>Sending...</Text>
+                  </View>
                 ) : (
-                  <Text style={styles.resetButtonText}>Send Reset Link</Text>
+                  <Text style={styles.resetButtonText}>Send Reset Instructions</Text>
                 )}
               </TouchableOpacity>
             </>
-          ) : (
+          )}
+
+          {emailSent && (
             <View style={styles.successContainer}>
-              <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
-              <Text style={styles.successTitle}>Check Your Email</Text>
-              <Text style={styles.successDescription}>
-                We've sent instructions to reset your password to {email}
+              <View style={styles.successIconContainer}>
+                <Ionicons name="checkmark-circle" size={80} color={Colors.success} />
+              </View>
+              
+              <Text style={styles.successTitle}>Email Sent!</Text>
+              <Text style={styles.successMessage}>
+                Check your email inbox and follow the instructions to reset your password.
               </Text>
+              
               <TouchableOpacity 
-                style={styles.backToLoginButton}
-                onPress={() => navigation.navigate('Login')}
+                style={styles.resendButton}
+                onPress={handleResendEmail}
+                disabled={isLoading}
               >
-                <Text style={styles.backToLoginText}>Back to Login</Text>
+                <Text style={styles.resendButtonText}>
+                  Didn't receive the email? Resend
+                </Text>
               </TouchableOpacity>
             </View>
           )}
+          
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.navigate('Login')}
+            disabled={isLoading}
+          >
+            <Ionicons name="arrow-back" size={20} color={Colors.primary} style={styles.backIcon} />
+            <Text style={styles.backButtonText}>Back to Sign In</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -114,24 +190,33 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingBottom: 40,
   },
-  iconContainer: {
+  logoContainer: {
     alignItems: 'center',
     marginTop: 60,
-    marginBottom: 40,
+    marginBottom: 30,
+  },
+  logo: {
+    height: 100,
+    width: 100,
   },
   formContainer: {
     paddingHorizontal: 30,
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
   },
   formTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333333',
+    marginTop: 16,
     marginBottom: 12,
   },
-  formDescription: {
+  subtitle: {
     fontSize: 16,
     color: '#666666',
-    marginBottom: 24,
+    textAlign: 'center',
     lineHeight: 22,
   },
   inputContainer: {
@@ -141,7 +226,7 @@ const styles = StyleSheet.create({
     borderColor: '#DDDDDD',
     borderRadius: 8,
     paddingHorizontal: 12,
-    marginBottom: 24,
+    marginBottom: 20,
     height: 50,
   },
   inputIcon: {
@@ -159,50 +244,82 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
+  },
+  disabledButton: {
+    backgroundColor: '#CCCCCC',
   },
   resetButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  backButton: {
+  loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
   },
-  backButtonText: {
-    color: Colors.primary,
+  loadingText: {
+    color: '#FFFFFF',
     fontSize: 16,
-    marginLeft: 4,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   successContainer: {
     alignItems: 'center',
     paddingVertical: 20,
   },
-  successTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333333',
-    marginTop: 16,
-    marginBottom: 8,
+  successIconContainer: {
+    marginBottom: 20,
   },
-  successDescription: {
+  successTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.success,
+    marginBottom: 12,
+  },
+  successMessage: {
     fontSize: 16,
     color: '#666666',
     textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 24,
+    lineHeight: 22,
+    marginBottom: 20,
   },
-  backToLoginButton: {
-    backgroundColor: Colors.primary,
+  resendButton: {
+    paddingVertical: 10,
+  },
+  resendButtonText: {
+    color: Colors.primary,
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#DDDDDD',
+  },
+  dividerText: {
+    paddingHorizontal: 10,
+    color: '#666666',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 30,
+    borderWidth: 1,
+    borderColor: Colors.primary,
     borderRadius: 8,
   },
-  backToLoginText: {
-    color: '#FFFFFF',
+  backIcon: {
+    marginRight: 8,
+  },
+  backButtonText: {
+    color: Colors.primary,
     fontSize: 16,
     fontWeight: 'bold',
   },

@@ -25,28 +25,58 @@ const LoginScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState('customer'); // Default role
 
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleLogin = async () => {
     // Basic validation
-    if (!email || !password) {
+    if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (!validateEmail(email.trim())) {
+      Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
     setIsLoading(true);
     
     try {
-      // Pass the role to the login function
-      const result = await login(email, password, selectedRole);
+      // Pass the selected role to the login function for validation
+      const result = await login(email.trim().toLowerCase(), password, selectedRole);
       
       if (!result.success) {
         Alert.alert('Login Failed', result.error || 'Please check your credentials');
       }
+      // Success is handled by the auth state change in AuthContext
+      
     } catch (error) {
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
-      console.log('Login error:', error);
+      console.error('Login error:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleForgotPassword = () => {
+    if (!email.trim()) {
+      Alert.alert(
+        'Email Required', 
+        'Please enter your email address first, then tap "Forgot Password" to receive reset instructions.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    if (!validateEmail(email.trim())) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+    
+    navigation.navigate('ForgotPassword', { email: email.trim().toLowerCase() });
   };
 
   return (
@@ -81,6 +111,7 @@ const LoginScreen = ({ navigation }) => {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
             />
           </View>
           
@@ -92,6 +123,8 @@ const LoginScreen = ({ navigation }) => {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
             />
             <TouchableOpacity 
               style={styles.eyeIcon} 
@@ -107,7 +140,7 @@ const LoginScreen = ({ navigation }) => {
           
           {/* Role selector */}
           <View style={styles.roleContainer}>
-            <Text style={styles.roleText}>I am a:</Text>
+            <Text style={styles.roleText}>I am signing in as a:</Text>
             <View style={styles.roleButtonsContainer}>
               <TouchableOpacity
                 style={[
@@ -115,6 +148,7 @@ const LoginScreen = ({ navigation }) => {
                   selectedRole === 'customer' ? styles.selectedRoleButton : {}
                 ]}
                 onPress={() => setSelectedRole('customer')}
+                disabled={isLoading}
               >
                 <Ionicons 
                   name="person-outline" 
@@ -135,6 +169,7 @@ const LoginScreen = ({ navigation }) => {
                   selectedRole === 'handyman' ? styles.selectedRoleButton : {}
                 ]}
                 onPress={() => setSelectedRole('handyman')}
+                disabled={isLoading}
               >
                 <Ionicons 
                   name="build-outline" 
@@ -153,18 +188,22 @@ const LoginScreen = ({ navigation }) => {
           
           <TouchableOpacity 
             style={styles.forgotPassword}
-            onPress={() => navigation.navigate('ForgotPassword')}
+            onPress={handleForgotPassword}
+            disabled={isLoading}
           >
             <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={styles.loginButton}
+            style={[styles.loginButton, isLoading && styles.disabledButton]}
             onPress={handleLogin}
             disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator color="#FFFFFF" size="small" />
+                <Text style={styles.loadingText}>Signing in...</Text>
+              </View>
             ) : (
               <Text style={styles.loginButtonText}>Sign In</Text>
             )}
@@ -179,6 +218,7 @@ const LoginScreen = ({ navigation }) => {
           <TouchableOpacity 
             style={styles.registerButton}
             onPress={() => navigation.navigate('Register')}
+            disabled={isLoading}
           >
             <Text style={styles.registerButtonText}>Create an Account</Text>
           </TouchableOpacity>
@@ -205,12 +245,6 @@ const styles = StyleSheet.create({
   logo: {
     height: 120,
     width: 120,
-  },
-  tagline: {
-    fontSize: 16,
-    color: '#666666',
-    marginTop: 10,
-    fontWeight: '500',
   },
   formContainer: {
     paddingHorizontal: 30,
@@ -298,10 +332,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 20,
   },
+  disabledButton: {
+    backgroundColor: '#CCCCCC',
+  },
   loginButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   divider: {
     flexDirection: 'row',
