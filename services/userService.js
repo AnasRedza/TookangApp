@@ -1,0 +1,302 @@
+// services/userService.js
+import { db } from '../firebase';
+import firebase from 'firebase/compat/app';
+
+export const userService = {
+  // Create a new user profile
+  createUser: async (userId, userData) => {
+    try {
+      const userDoc = {
+        ...userData,
+        isActive: true,
+        profileComplete: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      };
+      
+      await db.collection('users').doc(userId).set(userDoc);
+      
+      return {
+        id: userId,
+        ...userDoc,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
+    }
+  },
+
+  // Get user by ID
+  getUserById: async (userId) => {
+    try {
+      const doc = await db.collection('users').doc(userId).get();
+      if (doc.exists) {
+        const userData = doc.data();
+        return {
+          id: doc.id,
+          ...userData,
+          // Convert timestamps to ISO strings
+          createdAt: userData.createdAt?.toDate()?.toISOString(),
+          updatedAt: userData.updatedAt?.toDate()?.toISOString(),
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting user:', error);
+      throw error;
+    }
+  },
+
+  // Update user profile
+  updateUserProfile: async (userId, updates) => {
+    try {
+      const updateData = {
+        ...updates,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      };
+      
+      await db.collection('users').doc(userId).update(updateData);
+      return true;
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      throw error;
+    }
+  },
+
+  // Search handymen by criteria
+  searchHandymen: async (searchCriteria = {}) => {
+    try {
+      let query = db.collection('users').where('role', '==', 'handyman');
+      
+      // Apply filters
+      if (searchCriteria.category) {
+        query = query.where('serviceCategories', 'array-contains', searchCriteria.category);
+      }
+      
+      if (searchCriteria.location) {
+        // For location search, we might need to implement geo-queries
+        // For now, we'll do a simple text match
+        query = query.where('location', '>=', searchCriteria.location)
+                    .where('location', '<=', searchCriteria.location + '\uf8ff');
+      }
+      
+      if (searchCriteria.minRating) {
+        query = query.where('rating', '>=', searchCriteria.minRating);
+      }
+      
+      const snapshot = await query.get();
+      
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        // Convert timestamps to ISO strings
+        createdAt: doc.data().createdAt?.toDate()?.toISOString(),
+        updatedAt: doc.data().updatedAt?.toDate()?.toISOString(),
+      }));
+    } catch (error) {
+      console.error('Error searching handymen:', error);
+      throw error;
+    }
+  },
+
+  // Get handymen by category
+  getHandymenByCategory: async (category) => {
+    try {
+      const snapshot = await db.collection('users')
+        .where('role', '==', 'handyman')
+        .where('serviceCategories', 'array-contains', category)
+        .where('isActive', '==', true)
+        .orderBy('rating', 'desc')
+        .get();
+
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        // Convert timestamps to ISO strings
+        createdAt: doc.data().createdAt?.toDate()?.toISOString(),
+        updatedAt: doc.data().updatedAt?.toDate()?.toISOString(),
+      }));
+    } catch (error) {
+      console.error('Error getting handymen by category:', error);
+      throw error;
+    }
+  },
+
+  // Get top rated handymen
+  getTopRatedHandymen: async (limit = 10) => {
+    try {
+      const snapshot = await db.collection('users')
+        .where('role', '==', 'handyman')
+        .where('isActive', '==', true)
+        .orderBy('rating', 'desc')
+        .limit(limit)
+        .get();
+
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        // Convert timestamps to ISO strings
+        createdAt: doc.data().createdAt?.toDate()?.toISOString(),
+        updatedAt: doc.data().updatedAt?.toDate()?.toISOString(),
+      }));
+    } catch (error) {
+      console.error('Error getting top rated handymen:', error);
+      throw error;
+    }
+  },
+
+  // Update handyman rating and review count
+  updateHandymanRating: async (handymanId, newRating, incrementReviews = true) => {
+    try {
+      const updates = {
+        rating: newRating,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      };
+      
+      if (incrementReviews) {
+        updates.reviewCount = firebase.firestore.FieldValue.increment(1);
+      }
+      
+      await db.collection('users').doc(handymanId).update(updates);
+      return true;
+    } catch (error) {
+      console.error('Error updating handyman rating:', error);
+      throw error;
+    }
+  },
+
+  // Increment completed jobs for handyman
+  incrementCompletedJobs: async (handymanId) => {
+    try {
+      await db.collection('users').doc(handymanId).update({
+        completedJobs: firebase.firestore.FieldValue.increment(1),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (error) {
+      console.error('Error incrementing completed jobs:', error);
+      throw error;
+    }
+  },
+
+  // Check if user exists by email
+  getUserByEmail: async (email) => {
+    try {
+      const snapshot = await db.collection('users')
+        .where('email', '==', email.toLowerCase())
+        .get();
+      
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        const userData = doc.data();
+        return {
+          id: doc.id,
+          ...userData,
+          // Convert timestamps to ISO strings
+          createdAt: userData.createdAt?.toDate()?.toISOString(),
+          updatedAt: userData.updatedAt?.toDate()?.toISOString(),
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting user by email:', error);
+      throw error;
+    }
+  },
+
+  // Update user's last active timestamp
+  updateLastActive: async (userId) => {
+    try {
+      await db.collection('users').doc(userId).update({
+        lastActiveAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (error) {
+      console.error('Error updating last active:', error);
+      throw error;
+    }
+  },
+
+  // Deactivate user account
+  deactivateUser: async (userId) => {
+    try {
+      await db.collection('users').doc(userId).update({
+        isActive: false,
+        deactivatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (error) {
+      console.error('Error deactivating user:', error);
+      throw error;
+    }
+  },
+
+  // Get user statistics
+  getUserStats: async (userId) => {
+    try {
+      const user = await this.getUserById(userId);
+      if (!user) throw new Error('User not found');
+      
+      const stats = {
+        profileComplete: user.profileComplete || false,
+        joinDate: user.createdAt,
+        lastActive: user.lastActiveAt,
+        isActive: user.isActive,
+      };
+      
+      if (user.role === 'handyman') {
+        stats.rating = user.rating || 0;
+        stats.reviewCount = user.reviewCount || 0;
+        stats.completedJobs = user.completedJobs || 0;
+        stats.hourlyRate = user.hourlyRate || 0;
+        stats.experience = user.experience || 0;
+        stats.serviceCategories = user.serviceCategories || [];
+      }
+      
+      return stats;
+    } catch (error) {
+      console.error('Error getting user stats:', error);
+      throw error;
+    }
+  },
+
+  // Update user service categories (for handymen)
+  updateServiceCategories: async (handymanId, categories) => {
+    try {
+      await db.collection('users').doc(handymanId).update({
+        serviceCategories: categories,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (error) {
+      console.error('Error updating service categories:', error);
+      throw error;
+    }
+  },
+
+  // Update user location
+  updateUserLocation: async (userId, location, coordinates = null) => {
+    try {
+      const updates = {
+        location,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      };
+      
+      if (coordinates) {
+        updates.coordinates = new firebase.firestore.GeoPoint(
+          coordinates.latitude,
+          coordinates.longitude
+        );
+      }
+      
+      await db.collection('users').doc(userId).update(updates);
+      return true;
+    } catch (error) {
+      console.error('Error updating user location:', error);
+      throw error;
+    }
+  }
+};

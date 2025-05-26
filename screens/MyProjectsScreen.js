@@ -8,17 +8,22 @@ import {
   Alert,
   ActivityIndicator,
   SafeAreaView,
-  Image
+  Image,
+  RefreshControl
 } from 'react-native';
 import { CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { projectService } from '../services/projectService';
+import { userService } from '../services/userService';
 import Colors from '../constants/Colors';
 
 const MyProjectsScreen = ({ route, navigation }) => {
-  const { isHandyman } = useAuth();
+  const { user, isHandyman } = useAuth();
   const [projects, setProjects] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
   
   // Different tab labels based on role
   const tabs = isHandyman ? 
@@ -34,147 +39,74 @@ const MyProjectsScreen = ({ route, navigation }) => {
     if (route.params?.newProject) {
       addNewProject(route.params.newProject);
     }
-  }, [route.params?.newProject]);
+  }, [activeTab, route.params?.newProject]);
   
-  const fetchProjects = () => {
-    setIsLoading(true);
+  // Real-time listener for projects
+  useEffect(() => {
+    if (!user?.id) return;
     
-    // Simulate API call
-    setTimeout(() => {
-      // Mock projects data
-      const mockProjects = [
-        {
-          id: '1',
-          title: 'Fix leaking bathroom sink',
-          category: 'Plumbing',
-          initialBudget: 120,
-          agreedBudget: 150,
-          description: 'The bathroom sink has been leaking for a week. Need to fix the pipes underneath.',
-          status: 'agreed_scheduled',
-          location: '123 Main Street, Kuala Lumpur',
-          preferredDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-          preferredTime: 'morning',
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          isNegotiable: true,
-          handyman: {
-            id: 'h1',
-            name: 'John Plumber',
-            avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-            rating: 4.8
-          },
-          customer: {
-            id: 'c1',
-            name: 'Alice Chen',
-            avatar: 'https://randomuser.me/api/portraits/women/44.jpg'
-          }
-        },
-        {
-          id: '2',
-          title: 'Install ceiling fan',
-          category: 'Electrical',
-          initialBudget: 85,
-          description: 'Need to install a new ceiling fan in the living room.',
-          status: 'pending_handyman_review',
-          location: '456 Park Avenue, Petaling Jaya',
-          preferredDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
-          preferredTime: 'afternoon',
-          createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          isNegotiable: true,
-          handyman: {
-            id: 'h2',
-            name: 'Mike Electrician',
-            avatar: 'https://randomuser.me/api/portraits/men/67.jpg',
-            rating: 4.6
-          },
-          customer: {
-            id: 'c1',
-            name: 'Alice Chen',
-            avatar: 'https://randomuser.me/api/portraits/women/44.jpg'
-          }
-        },
-        {
-          id: '3',
-          title: 'Paint living room walls',
-          category: 'Painting',
-          initialBudget: 350,
-          agreedBudget: 400,
-          adjustedBudget: 450,
-          adjustmentReason: 'Additional wall preparation required',
-          description: 'Need to paint my living room walls. The room is approximately 15x20 feet.',
-          status: 'requires_adjustment',
-          location: '789 Garden Road, Subang Jaya',
-          preferredDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          preferredTime: 'anytime',
-          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          isNegotiable: true,
-          handyman: {
-            id: 'h3',
-            name: 'Paul Painter',
-            avatar: 'https://randomuser.me/api/portraits/men/22.jpg',
-            rating: 4.9
-          },
-          customer: {
-            id: 'c1',
-            name: 'Alice Chen',
-            avatar: 'https://randomuser.me/api/portraits/women/44.jpg'
-          }
-        },
-        {
-          id: '4',
-          title: 'Fix garden irrigation',
-          category: 'Landscaping',
-          initialBudget: 150,
-          agreedBudget: 180,
-          description: 'The irrigation system in my garden is not working properly. Some sprinklers are not functioning.',
-          status: 'requires_payment',
-          location: '101 Hill View, Ampang',
-          preferredDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          preferredTime: 'morning',
-          createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-          isNegotiable: false,
-          handyman: {
-            id: 'h4',
-            name: 'Gary Gardener',
-            avatar: 'https://randomuser.me/api/portraits/men/89.jpg',
-            rating: 4.7
-          },
-          customer: {
-            id: 'c1',
-            name: 'Alice Chen',
-            avatar: 'https://randomuser.me/api/portraits/women/44.jpg'
-          }
-        },
-        {
-          id: '5',
-          title: 'Repair air conditioning unit',
-          category: 'HVAC',
-          initialBudget: 200,
-          agreedBudget: 220,
-          description: 'AC unit in master bedroom is not cooling properly.',
-          status: 'completed',
-          location: '222 Lake View, Bangsar',
-          preferredDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          preferredTime: 'afternoon',
-          createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-          completedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-          isNegotiable: true,
-          handyman: {
-            id: 'h5',
-            name: 'Harry HVAC',
-            avatar: 'https://randomuser.me/api/portraits/men/45.jpg',
-            rating: 4.5
-          },
-          customer: {
-            id: 'c1',
-            name: 'Alice Chen',
-            avatar: 'https://randomuser.me/api/portraits/women/44.jpg'
-          }
-        }
-      ];
+    const unsubscribe = projectService.subscribeToUserProjects(
+      user.id,
+      isHandyman ? 'handyman' : 'customer',
+      (updatedProjects) => {
+        setProjects(updatedProjects);
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Error in projects subscription:', error);
+        setError('Failed to load projects');
+        setIsLoading(false);
+      }
+    );
+    
+    return () => unsubscribe && unsubscribe();
+  }, [user?.id, isHandyman]);
+  
+  const fetchProjects = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setError(null);
+      const userProjects = await projectService.getUserProjects(
+        user.id, 
+        isHandyman ? 'handyman' : 'customer'
+      );
       
-      setProjects(mockProjects);
+      // Enrich projects with user data
+      const enrichedProjects = await Promise.all(
+        userProjects.map(async (project) => {
+          try {
+            // Get the other party's info (customer for handyman, handyman for customer)
+            const otherUserId = isHandyman ? project.customerId : project.handymanId;
+            if (otherUserId) {
+              const otherUser = await userService.getUserById(otherUserId);
+              if (isHandyman) {
+                project.customer = otherUser;
+              } else {
+                project.handyman = otherUser;
+              }
+            }
+            return project;
+          } catch (error) {
+            console.error('Error enriching project:', error);
+            return project;
+          }
+        })
+      );
+      
+      setProjects(enrichedProjects);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      setError('Failed to load projects');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
+  };
+  
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchProjects();
+    setRefreshing(false);
   };
   
   // Add new project
@@ -208,11 +140,10 @@ const MyProjectsScreen = ({ route, navigation }) => {
     }
   };
   
-  // Handle navigation to project details - FIXED NAVIGATION
+  // Handle navigation to project details
   const handleViewProject = (project) => {
     console.log('Navigating to project details for:', project.title);
     
-    // Important: Navigate with proper parameters to match ProjectDetailScreen
     navigation.navigate('ProjectDetails', { 
       project: project,
       viewMode: 'normal'
@@ -220,19 +151,27 @@ const MyProjectsScreen = ({ route, navigation }) => {
   };
   
   // Handle pay now button
-  const handlePayForProject = (project) => {
-    navigation.dispatch(
-      CommonActions.navigate({
-        name: 'HomeTab',
-        params: {
-          screen: 'Payment',
+  const handlePayForProject = async (project) => {
+    try {
+      // Update project status to indicate payment is being processed
+      await projectService.updateProjectStatus(project.id, 'payment_processing');
+      
+      navigation.dispatch(
+        CommonActions.navigate({
+          name: 'HomeTab',
           params: {
-            project: project,
-            total: parseFloat(project.adjustedBudget || project.agreedBudget || project.initialBudget)
-          }
-        },
-      })
-    );
+            screen: 'Payment',
+            params: {
+              project: project,
+              total: parseFloat(project.adjustedBudget || project.agreedBudget || project.initialBudget)
+            }
+          },
+        })
+      );
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      Alert.alert('Error', 'Failed to process payment. Please try again.');
+    }
   };
   
   // Handle view adjustment
@@ -254,8 +193,59 @@ const MyProjectsScreen = ({ route, navigation }) => {
     );
   };
   
+  // Handle project completion (for handymen)
+  const handleCompleteProject = async (project) => {
+    Alert.alert(
+      "Complete Project",
+      "Mark this project as completed?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Complete", 
+          onPress: async () => {
+            try {
+              await projectService.updateProjectStatus(project.id, 'completed', {
+                completedAt: new Date().toISOString()
+              });
+              
+              Alert.alert("Success", "Project marked as completed!");
+            } catch (error) {
+              console.error('Error completing project:', error);
+              Alert.alert("Error", "Failed to update project status. Please try again.");
+            }
+          }
+        }
+      ]
+    );
+  };
+  
+  // Handle project cancellation
+  const handleCancelProject = async (project) => {
+    Alert.alert(
+      "Cancel Project",
+      "Are you sure you want to cancel this project?",
+      [
+        { text: "No", style: "cancel" },
+        { 
+          text: "Yes", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await projectService.updateProjectStatus(project.id, 'cancelled');
+              Alert.alert("Project Cancelled", "The project has been cancelled.");
+            } catch (error) {
+              console.error('Error cancelling project:', error);
+              Alert.alert("Error", "Failed to cancel project. Please try again.");
+            }
+          }
+        }
+      ]
+    );
+  };
+  
   // Format date
   const formatDate = (dateString) => {
+    if (!dateString) return 'Not specified';
     const options = { month: 'short', day: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
@@ -264,11 +254,13 @@ const MyProjectsScreen = ({ route, navigation }) => {
   const getStatusLabel = (status) => {
     if (isHandyman) {
       switch(status) {
+        case 'open': return 'Available Job';
         case 'pending_handyman_review': return 'New Job Request';
         case 'in_negotiation': return 'In Discussion';
         case 'agreed_scheduled': return 'Job Scheduled';
         case 'requires_adjustment': return 'Budget Adjustment Sent';
         case 'requires_payment': return 'Awaiting Payment';
+        case 'payment_processing': return 'Payment Processing';
         case 'in_progress': return 'In Progress';
         case 'completed': return 'Completed';
         case 'cancelled': return 'Cancelled';
@@ -277,11 +269,13 @@ const MyProjectsScreen = ({ route, navigation }) => {
       }
     } else {
       switch(status) {
+        case 'open': return 'Open Project';
         case 'pending_handyman_review': return 'Pending Review';
         case 'in_negotiation': return 'In Negotiation';
         case 'agreed_scheduled': return 'Agreed & Scheduled';
         case 'requires_adjustment': return 'Adjustment Needed';
         case 'requires_payment': return 'Payment Required';
+        case 'payment_processing': return 'Payment Processing';
         case 'in_progress': return 'In Progress';
         case 'completed': return 'Completed';
         case 'cancelled': return 'Cancelled';
@@ -294,11 +288,13 @@ const MyProjectsScreen = ({ route, navigation }) => {
   // Get status color
   const getStatusColor = (status) => {
     switch(status) {
+      case 'open': return '#2196F3';
       case 'pending_handyman_review': return '#FFA000';
       case 'in_negotiation': return '#2196F3';
       case 'agreed_scheduled': return '#8BC34A';
       case 'requires_adjustment': return '#FF5722';
       case 'requires_payment': return '#E91E63';
+      case 'payment_processing': return '#9C27B0';
       case 'in_progress': return '#03A9F4';
       case 'completed': return '#4CAF50';
       case 'cancelled': return '#F44336';
@@ -340,8 +336,8 @@ const MyProjectsScreen = ({ route, navigation }) => {
           <Ionicons name="calendar-outline" size={16} color="#666" />
           <Text style={styles.infoText}>
             {isHandyman 
-              ? `Scheduled: ${formatDate(item.preferredDate)}, ${item.preferredTime}` 
-              : `Preferred: ${formatDate(item.preferredDate)}, ${item.preferredTime}`
+              ? `Scheduled: ${formatDate(item.preferredDate)}` 
+              : `Preferred: ${formatDate(item.preferredDate)}`
             }
           </Text>
         </View>
@@ -350,7 +346,7 @@ const MyProjectsScreen = ({ route, navigation }) => {
         <View style={styles.budgetContainer}>
           <Text style={styles.budgetLabel}>{isHandyman ? 'Earnings:' : 'Budget:'}</Text>
           <Text style={styles.budgetAmount}>
-            RM {parseFloat(item.adjustedBudget || item.agreedBudget || item.initialBudget).toFixed(2)}
+            RM {parseFloat(item.adjustedBudget || item.agreedBudget || item.initialBudget || 0).toFixed(2)}
           </Text>
         </View>
         
@@ -359,20 +355,29 @@ const MyProjectsScreen = ({ route, navigation }) => {
         <View style={styles.footer}>
           {/* Other party info */}
           <View style={styles.partyInfo}>
-            <Image 
-              source={{ uri: otherParty.avatar }} 
-              style={styles.avatarImage} 
-            />
-            <View style={styles.partyDetails}>
-              <Text style={styles.partyLabel}>{isHandyman ? 'Customer:' : 'Handyman:'}</Text>
-              <Text style={styles.partyName}>{otherParty.name}</Text>
-              {!isHandyman && otherParty.rating && (
-                <View style={styles.ratingContainer}>
-                  <Ionicons name="star" size={12} color="#FFC107" />
-                  <Text style={styles.ratingText}>{otherParty.rating}</Text>
+            {otherParty ? (
+              <>
+                <Image 
+                  source={{ uri: otherParty.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherParty.name)}&background=random` }} 
+                  style={styles.avatarImage} 
+                />
+                <View style={styles.partyDetails}>
+                  <Text style={styles.partyLabel}>{isHandyman ? 'Customer:' : 'Handyman:'}</Text>
+                  <Text style={styles.partyName}>{otherParty.name}</Text>
+                  {!isHandyman && otherParty.rating && (
+                    <View style={styles.ratingContainer}>
+                      <Ionicons name="star" size={12} color="#FFC107" />
+                      <Text style={styles.ratingText}>{otherParty.rating}</Text>
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
+              </>
+            ) : (
+              <View style={styles.partyDetails}>
+                <Text style={styles.partyLabel}>{isHandyman ? 'Customer:' : 'Handyman:'}</Text>
+                <Text style={styles.partyName}>Loading...</Text>
+              </View>
+            )}
           </View>
           
           {/* Action buttons */}
@@ -394,11 +399,45 @@ const MyProjectsScreen = ({ route, navigation }) => {
                 <Text style={styles.viewButtonText}>View Adjustment</Text>
               </TouchableOpacity>
             )}
+            
+            {isHandyman && item.status === 'in_progress' && (
+              <TouchableOpacity 
+                style={styles.completeButton}
+                onPress={() => handleCompleteProject(item)}
+              >
+                <Text style={styles.completeButtonText}>Complete</Text>
+              </TouchableOpacity>
+            )}
+            
+            {(item.status === 'open' || item.status === 'pending_handyman_review') && (
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => handleCancelProject(item)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </TouchableOpacity>
     );
   };
+  
+  // Error state
+  if (error && !refreshing) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color={Colors.error} />
+          <Text style={styles.errorTitle}>Something went wrong</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchProjects}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
   
   return (
     <SafeAreaView style={styles.container}>
@@ -436,7 +475,7 @@ const MyProjectsScreen = ({ route, navigation }) => {
       </View>
       
       {/* Projects/Jobs List */}
-      {isLoading ? (
+      {isLoading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={styles.loadingText}>
@@ -450,6 +489,13 @@ const MyProjectsScreen = ({ route, navigation }) => {
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[Colors.primary]}
+            />
+          }
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
               <Ionicons 
@@ -604,6 +650,7 @@ const styles = StyleSheet.create({
   partyInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   avatarImage: {
     width: 36,
@@ -612,7 +659,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   partyDetails: {
-    flexDirection: 'column',
+    flex: 1,
   },
   partyLabel: {
     fontSize: 12,
@@ -659,6 +706,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  completeButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  completeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    backgroundColor: '#F44336',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  cancelButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -668,6 +737,36 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -684,6 +783,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginBottom: 24,
+    textAlign: 'center',
   },
   floatingButton: {
     position: 'absolute',

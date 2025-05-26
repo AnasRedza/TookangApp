@@ -24,6 +24,9 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../firebase';
+import firebase from '../firebase';
 
 // Custom color theme as provided
 const Colors = {
@@ -51,13 +54,14 @@ const Colors = {
   
   // Other UI colors
   inactive: '#E0E0E0',   // Very light gray for inactive elements
-  highlight: '#FFF9DD',  // Soft yellow highlight
+  highlight: '#FFF9DD',  // Soft yellow highlight that complements the logo
 };
 
 const { width, height } = Dimensions.get('window');
 
 const ProjectBidScreen = ({ route, navigation }) => {
   const { handyman } = route.params || {};
+  const { user } = useAuth();
   const scrollY = useRef(new Animated.Value(0)).current;
   
   // Form sections for progress tracking
@@ -101,15 +105,6 @@ const ProjectBidScreen = ({ route, navigation }) => {
   const [currentSection, setCurrentSection] = useState(0);
   const [formProgress, setFormProgress] = useState(0);
   const successScale = useRef(new Animated.Value(0)).current;
-  
-  // Time slots in 30-min increments
-  const TIME_SLOTS = Array.from({ length: 24 * 2 }).map((_, i) => {
-    const hour = Math.floor(i / 2);
-    const minute = (i % 2) * 30;
-    const time = new Date();
-    time.setHours(hour, minute, 0, 0);
-    return time;
-  });
   
   // Update progress when form fields change
   useEffect(() => {
@@ -255,12 +250,6 @@ const ProjectBidScreen = ({ route, navigation }) => {
     setShowTimePicker(true);
   };
   
-  // Handle time slot selection
-  const handleTimeSlotSelect = (time) => {
-    handleChange('preferredTime', time);
-    setShowTimePicker(false);
-  };
-  
   // Handle date change
   const handleDateChange = (event, selectedValue) => {
     if (Platform.OS === 'android') {
@@ -278,14 +267,6 @@ const ProjectBidScreen = ({ route, navigation }) => {
         0
       );
       handleChange('preferredDate', newDate);
-    }
-  };
-  
-  // Select specific date
-  const selectDate = (date) => {
-    handleChange('preferredDate', date);
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
     }
   };
   
@@ -327,7 +308,7 @@ const ProjectBidScreen = ({ route, navigation }) => {
   // Handle image picking
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaType.Images,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
@@ -393,25 +374,88 @@ const ProjectBidScreen = ({ route, navigation }) => {
     // Navigation is now handled in handleSubmit
   };
   
-  // Handle form submission
-  const handleSubmit = () => {
-    if (validateForm()) {
-      setIsLoading(true);
-      
-      // Simulate API call
-      setTimeout(() => {
-        setIsLoading(false);
-        animateSuccess();
-        
-        // Navigation happens after success animation
-        setTimeout(() => {
-          setShowSuccessAnimation(false);
-          navigation.navigate('ProjectsTab', { screen: 'MyProjects' });
-        }, 1500); // Match this with animation duration
-      }, 1500);
-    } else {
+  // Handle form submission with Firebase
+  const handleSubmit = async () => {
+    if (!validateForm()) {
       // Scroll to top if there are errors
       scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: true });
+      return;
+    }
+
+    if (!user) {
+      Alert.alert('Error', 'You must be logged in to create a project');
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      // Create project data
+      const projectData = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        category: formData.category,
+        location: formData.location.trim(),
+        budget: parseFloat(formData.budget),
+        isNegotiable: formData.isNegotiable,
+        preferredDate: firebase.firestore.Timestamp.fromDate(formData.preferredDate),
+        preferredTime: firebase.firestore.Timestamp.fromDate(formData.preferredTime),
+        notes: formData.notes.trim(),
+        images: formData.images, // In production, you'd upload these to storage first
+        
+        // Project metadata
+        customerId: user.id,
+        customerName: user.name,
+        customerEmail: user.email,
+        status: 'open',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        
+        // Additional fields
+        handymanId: null,
+        handymanName: null,
+        acceptedAt: null,
+        completedAt: null,
+        rating: null,
+        review: null
+      };
+
+      // Create the project in Firestore
+      const docRef = await db.collection('projects').add(projectData);
+      
+      console.log('Project created with ID:', docRef.id);
+      
+      setIsLoading(false);
+      animateSuccess();
+      
+      // Navigation happens after success animation
+      setTimeout(() => {
+        setShowSuccessAnimation(false);
+        navigation.navigate('ProjectsTab', { 
+          screen: 'MyProjects',
+          params: {
+            newProject: {
+              id: docRef.id,
+              ...projectData,
+              createdAt: new Date().toISOString()
+            }
+          }
+        });
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error creating project:', error);
+      setIsLoading(false);
+      
+      let errorMessage = 'Failed to create project. Please try again.';
+      
+      if (error.code === 'permission-denied') {
+        errorMessage = 'You do not have permission to create projects. Please check your account status.';
+      } else if (error.code === 'unauthenticated') {
+        errorMessage = 'You must be logged in to create a project.';
+      }
+      
+      Alert.alert('Error', errorMessage);
     }
   };
 
@@ -427,13 +471,9 @@ const ProjectBidScreen = ({ route, navigation }) => {
         style={styles.progressBar}
       />
     ) : (
-      <ProgressBarAndroid
-        styleAttr="Horizontal"
-        indeterminate={false}
-        progress={formProgress}
-        color={Colors.secondary}
-        style={styles.progressBar}
-      />
+      <View style={styles.progressBar}>
+        <View style={[styles.progressFill, { width: `${formProgress * 100}%` }]} />
+      </View>
     );
   };
 
@@ -660,7 +700,7 @@ const ProjectBidScreen = ({ route, navigation }) => {
                 <Text style={styles.sectionTitle}>{SECTIONS[3].title}</Text>
               </View>
               
-              {/* Date Picker - Material Design Style */}
+              {/* Date Picker */}
               <View style={styles.questionContainer}>
                 <View style={styles.questionLabelContainer}>
                   <Text style={styles.questionLabel}>Preferred Date</Text>
@@ -676,7 +716,7 @@ const ProjectBidScreen = ({ route, navigation }) => {
                 </TouchableOpacity>
               </View>
               
-              {/* Time Picker - Material Design Style */}
+              {/* Time Picker */}
               <View style={styles.questionContainer}>
                 <View style={styles.questionLabelContainer}>
                   <Text style={styles.questionLabel}>Preferred Time</Text>
@@ -781,7 +821,7 @@ const ProjectBidScreen = ({ route, navigation }) => {
         </View>
       </KeyboardAvoidingView>
       
-      {/* Material Design Date Picker */}
+      {/* Date Picker */}
       {showDatePicker && (
         <Modal
           transparent={true}
@@ -796,17 +836,6 @@ const ProjectBidScreen = ({ route, navigation }) => {
                 <Text style={styles.materialModalSelectedDate}>
                   {formatDate(formData.preferredDate).replace(',', '')}
                 </Text>
-                <View style={styles.materialModalTabs}>
-                  <View style={styles.materialDaysRow}>
-                    <Text style={styles.dayHeader}>S</Text>
-                    <Text style={styles.dayHeader}>M</Text>
-                    <Text style={styles.dayHeader}>T</Text>
-                    <Text style={styles.dayHeader}>W</Text>
-                    <Text style={styles.dayHeader}>T</Text>
-                    <Text style={styles.dayHeader}>F</Text>
-                    <Text style={styles.dayHeader}>S</Text>
-                  </View>
-                </View>
               </View>
               
               <DateTimePicker
@@ -841,7 +870,7 @@ const ProjectBidScreen = ({ route, navigation }) => {
         </Modal>
       )}
       
-      {/* Material Design Time Picker */}
+      {/* Time Picker */}
       {showTimePicker && (
         <Modal
           transparent={true}
@@ -1081,12 +1110,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     flex: 1,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   progressContainer: {
     backgroundColor: Colors.card,
     paddingHorizontal: 16,
@@ -1099,8 +1122,15 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 6,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 3,
     marginBottom: 8,
     width: '100%',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.secondary,
+    borderRadius: 3,
   },
   progressText: {
     fontSize: 12,
@@ -1299,7 +1329,7 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
   },
   
-  // Material Design styles for date/time pickers
+  // Material Design Modal styles
   materialModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
@@ -1335,19 +1365,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#FFFFFF',
     marginBottom: 16,
-  },
-  materialModalTabs: {
-    marginTop: 8,
-  },
-  materialDaysRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dayHeader: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    width: 36,
-    textAlign: 'center',
   },
   materialDatePicker: {
     marginBottom: 16,
