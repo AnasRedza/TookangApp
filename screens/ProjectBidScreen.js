@@ -28,6 +28,9 @@ import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import firebase from '../firebase';
 
+// Import Firebase Storage
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+
 // Custom color theme as provided
 const Colors = {
   primary: '#333333',    // Dark charcoal
@@ -59,6 +62,9 @@ const Colors = {
 
 const { width, height } = Dimensions.get('window');
 
+// Initialize Firebase Storage
+const storage = getStorage();
+
 const ProjectBidScreen = ({ route, navigation }) => {
   const { handyman } = route.params || {};
   const { user } = useAuth();
@@ -88,7 +94,7 @@ const ProjectBidScreen = ({ route, navigation }) => {
     category: '',
     location: '',
     budget: '',
-    images: [],
+    images: [], // This will store { uri: string, url?: string, uploading?: boolean }
     isNegotiable: true,
     preferredDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
     preferredTime: new Date(new Date().setHours(12, 0, 0, 0)), // Default 12:00 PM
@@ -104,6 +110,7 @@ const ProjectBidScreen = ({ route, navigation }) => {
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [currentSection, setCurrentSection] = useState(0);
   const [formProgress, setFormProgress] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState({});
   const successScale = useRef(new Animated.Value(0)).current;
   
   // Update progress when form fields change
@@ -305,25 +312,143 @@ const ProjectBidScreen = ({ route, navigation }) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
   
-  // Handle image picking
+  // Upload image to Firebase Storage
+  const uploadImageToStorage = async (imageUri, imageId) => {
+    try {
+      // Convert image URI to blob
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      
+      // Create a reference to the file location
+      const imageRef = ref(storage, `project-images/${user.id}/${Date.now()}_${imageId}.jpg`);
+      
+      // Upload the file
+      await uploadBytes(imageRef, blob);
+      
+      // Get the download URL
+      const downloadURL = await getDownloadURL(imageRef);
+      
+      return {
+        success: true,
+        url: downloadURL,
+        storagePath: imageRef.fullPath
+      };
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  };
+  
+  // Delete image from Firebase Storage
+  const deleteImageFromStorage = async (storagePath) => {
+    try {
+      const imageRef = ref(storage, storagePath);
+      await deleteObject(imageRef);
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      return { success: false, error: error.message };
+    }
+  };
+  
+  // Handle image picking with upload
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-    
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      handleChange('images', [...formData.images, result.assets[0].uri]);
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaType.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const imageUri = result.assets[0].uri;
+        const imageId = Date.now().toString();
+        
+        // Add image with loading state
+        const newImage = {
+          id: imageId,
+          uri: imageUri,
+          uploading: true,
+          uploadProgress: 0
+        };
+        
+        handleChange('images', [...formData.images, newImage]);
+        
+        // Start upload
+        setUploadProgress(prev => ({ ...prev, [imageId]: 0 }));
+        
+        const uploadResult = await uploadImageToStorage(imageUri, imageId);
+        
+        if (uploadResult.success) {
+          // Update image with download URL
+          setFormData(prevData => ({
+            ...prevData,
+            images: prevData.images.map(img => 
+              img.id === imageId 
+                ? { 
+                    ...img, 
+                    url: uploadResult.url, 
+                    storagePath: uploadResult.storagePath,
+                    uploading: false 
+                  }
+                : img
+            )
+          }));
+          
+          // Clear upload progress
+          setUploadProgress(prev => {
+            const newProgress = { ...prev };
+            delete newProgress[imageId];
+            return newProgress;
+          });
+          
+          Alert.alert('Success', 'Image uploaded successfully!');
+        } else {
+          // Remove failed image
+          setFormData(prevData => ({
+            ...prevData,
+            images: prevData.images.filter(img => img.id !== imageId)
+          }));
+          
+          Alert.alert('Upload Failed', uploadResult.error || 'Failed to upload image');
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to select image. Please try again.');
     }
   };
   
   // Handle removing an image
-  const removeImage = (index) => {
-    const newImages = [...formData.images];
-    newImages.splice(index, 1);
-    handleChange('images', newImages);
+  const removeImage = async (index) => {
+    const imageToRemove = formData.images[index];
+    
+    Alert.alert(
+      'Remove Image',
+      'Are you sure you want to remove this image?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            // If image has been uploaded to storage, delete it
+            if (imageToRemove.storagePath) {
+              await deleteImageFromStorage(imageToRemove.storagePath);
+            }
+            
+            // Remove from local state
+            const newImages = [...formData.images];
+            newImages.splice(index, 1);
+            handleChange('images', newImages);
+          }
+        }
+      ]
+    );
   };
   
   // Validate the form
@@ -350,6 +475,12 @@ const ProjectBidScreen = ({ route, navigation }) => {
     
     if (!formData.location.trim()) {
       newErrors.location = 'Required';
+    }
+    
+    // Check if any images are still uploading
+    const uploadingImages = formData.images.filter(img => img.uploading);
+    if (uploadingImages.length > 0) {
+      newErrors.images = 'Please wait for all images to finish uploading';
     }
     
     setErrors(newErrors);
@@ -390,6 +521,11 @@ const ProjectBidScreen = ({ route, navigation }) => {
     setIsLoading(true);
     
     try {
+      // Prepare image URLs for storage
+      const imageUrls = formData.images
+        .filter(img => img.url && !img.uploading)
+        .map(img => img.url);
+      
       // Create project data
       const projectData = {
         title: formData.title.trim(),
@@ -401,7 +537,7 @@ const ProjectBidScreen = ({ route, navigation }) => {
         preferredDate: firebase.firestore.Timestamp.fromDate(formData.preferredDate),
         preferredTime: firebase.firestore.Timestamp.fromDate(formData.preferredTime),
         notes: formData.notes.trim(),
-        images: formData.images, // In production, you'd upload these to storage first
+        images: imageUrls, // Store the Firebase Storage URLs
         
         // Project metadata
         customerId: user.id,
@@ -750,18 +886,46 @@ const ProjectBidScreen = ({ route, navigation }) => {
                 
                 <View style={styles.imagesContainer}>
                   {formData.images.map((image, index) => (
-                    <View key={index} style={styles.imagePreviewContainer}>
-                      <Image source={{ uri: image }} style={styles.imagePreview} />
+                    <View key={image.id || index} style={styles.imagePreviewContainer}>
+                      <Image 
+                        source={{ uri: image.uri }} 
+                        style={[
+                          styles.imagePreview,
+                          image.uploading && styles.uploadingImage
+                        ]} 
+                      />
+                      
+                      {/* Upload progress overlay */}
+                      {image.uploading && (
+                        <View style={styles.uploadOverlay}>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                          <Text style={styles.uploadingText}>Uploading...</Text>
+                        </View>
+                      )}
+                      
+                      {/* Success indicator */}
+                      {image.url && !image.uploading && (
+                        <View style={styles.successIndicator}>
+                          <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+                        </View>
+                      )}
+                      
+                      {/* Remove button */}
                       <TouchableOpacity
                         style={styles.removeImageButton}
                         onPress={() => removeImage(index)}
+                        disabled={image.uploading}
                       >
-                        <Ionicons name="close-circle" size={24} color={Colors.error} />
+                        <Ionicons 
+                          name="close-circle" 
+                          size={24} 
+                          color={image.uploading ? '#CCCCCC' : Colors.error} 
+                        />
                       </TouchableOpacity>
                     </View>
                   ))}
                   
-                  {formData.images.length < 3 && (
+                  {formData.images.length < 5 && (
                     <TouchableOpacity
                       style={styles.addImageButton}
                       onPress={pickImage}
@@ -771,6 +935,10 @@ const ProjectBidScreen = ({ route, navigation }) => {
                     </TouchableOpacity>
                   )}
                 </View>
+                
+                {errors.images && (
+                  <Text style={styles.errorText}>{errors.images}</Text>
+                )}
               </View>
               
               {/* Additional Notes */}
@@ -806,16 +974,25 @@ const ProjectBidScreen = ({ route, navigation }) => {
         {/* Submit Button */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            style={styles.submitButton}
+            style={[
+              styles.submitButton,
+              (isLoading || formData.images.some(img => img.uploading)) && styles.disabledButton
+            ]}
             onPress={handleSubmit}
-            disabled={isLoading}
+            disabled={isLoading || formData.images.some(img => img.uploading)}
           >
             {isLoading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <View style={styles.loadingButtonContent}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text style={styles.submitButtonText}>Creating Project...</Text>
+              </View>
+            ) : formData.images.some(img => img.uploading) ? (
+              <View style={styles.loadingButtonContent}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text style={styles.submitButtonText}>Uploading Images...</Text>
+              </View>
             ) : (
-              <Text style={styles.submitButtonText}>
-                Submit
-              </Text>
+              <Text style={styles.submitButtonText}>Submit</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -1329,7 +1506,121 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
   },
   
-  // Material Design Modal styles
+  // Image Styles
+  imagesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  imagePreviewContainer: {
+    width: (width - 80) / 3,
+    height: (width - 80) / 3,
+    marginRight: 8,
+    marginBottom: 8,
+    position: 'relative',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  uploadingImage: {
+    opacity: 0.7,
+  },
+  uploadOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  uploadingText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  successIndicator: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 2,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  addImageButton: {
+    width: (width - 80) / 3,
+    height: (width - 80) / 3,
+    backgroundColor: Colors.background,
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  addImageText: {
+    fontSize: 14,
+    color: Colors.secondary,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  bottomSpace: {
+    height: 80,
+  },
+  buttonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  submitButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 4,
+    paddingVertical: 14,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  disabledButton: {
+    backgroundColor: '#CCCCCC',
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loadingButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  
+  // Material Design Modal styles (existing styles continue...)
   materialModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
@@ -1522,86 +1813,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   
-  // Image Styles
-  imagesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
-  },
-  imagePreviewContainer: {
-    width: (width - 80) / 3,
-    height: (width - 80) / 3,
-    marginRight: 8,
-    marginBottom: 8,
-    position: 'relative',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  imagePreview: {
-    width: '100%',
-    height: '100%',
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  addImageButton: {
-    width: (width - 80) / 3,
-    height: (width - 80) / 3,
-    backgroundColor: Colors.background,
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  addImageText: {
-    fontSize: 14,
-    color: Colors.secondary,
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  bottomSpace: {
-    height: 80,
-  },
-  buttonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  submitButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 4,
-    paddingVertical: 14,
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
   successOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',

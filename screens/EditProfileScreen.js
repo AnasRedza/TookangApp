@@ -1,3 +1,5 @@
+// Fixed EditProfileScreen.js with proper profile picture handling
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -23,6 +25,7 @@ const EditProfileScreen = ({ navigation }) => {
   const { user, isHandyman, updateUserProfile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [userData, setUserData] = useState({
     name: '',
     email: '',
@@ -40,11 +43,7 @@ const EditProfileScreen = ({ navigation }) => {
     'Plumbing', 'Electrical', 'Carpentry', 'Painting', 'Cleaning', 
     'HVAC', 'Landscaping', 'Appliance Repair', 'Flooring', 'Roofing'
   ];
-  
-  // States for adding new items (handyman only)
-  const [newCategory, setNewCategory] = useState({ name: '', price: '' });
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
-  
+
   // Load user data on component mount
   useEffect(() => {
     loadUserData();
@@ -66,7 +65,7 @@ const EditProfileScreen = ({ navigation }) => {
           hourlyRate: userProfile.hourlyRate?.toString() || '',
           experience: userProfile.experience?.toString() || '',
           serviceCategories: userProfile.serviceCategories || [],
-          profilePicture: getUserAvatarUri(userProfile),
+          profilePicture: userProfile.profilePicture || getUserAvatarUri(userProfile),
         });
       } else {
         // If no profile found, use user data from auth context
@@ -79,7 +78,7 @@ const EditProfileScreen = ({ navigation }) => {
           hourlyRate: user.hourlyRate?.toString() || '',
           experience: user.experience?.toString() || '',
           serviceCategories: user.serviceCategories || [],
-          profilePicture: getUserAvatarUri(user),
+          profilePicture: user.profilePicture || getUserAvatarUri(user),
         });
       }
     } catch (error) {
@@ -95,7 +94,7 @@ const EditProfileScreen = ({ navigation }) => {
         hourlyRate: user?.hourlyRate?.toString() || '',
         experience: user?.experience?.toString() || '',
         serviceCategories: user?.serviceCategories || [],
-        profilePicture: getUserAvatarUri(user),
+        profilePicture: user?.profilePicture || getUserAvatarUri(user),
       });
     } finally {
       setIsLoading(false);
@@ -109,6 +108,41 @@ const EditProfileScreen = ({ navigation }) => {
     }));
   };
 
+  // FIXED: Image upload with proper Firebase Storage handling
+  const uploadImageToFirebase = async (imageUri) => {
+    try {
+      setIsUploadingImage(true);
+      
+      // Import storage from your firebase config
+      const { storage } = require('../firebase');
+      
+      // Convert image to blob
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      
+      // Create unique filename with user ID and timestamp
+      const fileName = `profile_pictures/${user.id}_${Date.now()}.jpg`;
+      const ref = storage.ref().child(fileName);
+      
+      // Upload image to Firebase Storage
+      console.log('📤 Uploading image to Firebase Storage...');
+      await ref.put(blob);
+      
+      // Get the download URL
+      console.log('🔗 Getting download URL...');
+      const downloadURL = await ref.getDownloadURL();
+      
+      console.log('✅ Image uploaded successfully:', downloadURL);
+      return downloadURL;
+      
+    } catch (error) {
+      console.error('❌ Error uploading image:', error);
+      throw new Error('Failed to upload image to storage');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   const handleSelectImage = () => {
     Alert.alert(
       'Change Profile Photo',
@@ -116,6 +150,7 @@ const EditProfileScreen = ({ navigation }) => {
       [
         { text: 'Take Photo', onPress: takePhoto },
         { text: 'Choose from Gallery', onPress: pickImage },
+        { text: 'Remove Photo', onPress: removePhoto, style: 'destructive' },
         { text: 'Cancel', style: 'cancel' }
       ]
     );
@@ -123,7 +158,6 @@ const EditProfileScreen = ({ navigation }) => {
 
   const takePhoto = async () => {
     try {
-      // Request camera permissions
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       
       if (status !== 'granted') {
@@ -134,7 +168,6 @@ const EditProfileScreen = ({ navigation }) => {
         return;
       }
 
-      // Launch camera
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -143,7 +176,14 @@ const EditProfileScreen = ({ navigation }) => {
       });
 
       if (!result.canceled && result.assets && result.assets[0]) {
-        handleInputChange('profilePicture', result.assets[0].uri);
+        const imageUri = result.assets[0].uri;
+        
+        try {
+          const uploadedUrl = await uploadImageToFirebase(imageUri);
+          handleInputChange('profilePicture', uploadedUrl);
+        } catch (error) {
+          Alert.alert('Error', 'Failed to process image. Please try again.');
+        }
       }
     } catch (error) {
       console.error('Error taking photo:', error);
@@ -153,7 +193,6 @@ const EditProfileScreen = ({ navigation }) => {
 
   const pickImage = async () => {
     try {
-      // Request media library permissions
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
       if (status !== 'granted') {
@@ -164,7 +203,6 @@ const EditProfileScreen = ({ navigation }) => {
         return;
       }
 
-      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -173,12 +211,28 @@ const EditProfileScreen = ({ navigation }) => {
       });
 
       if (!result.canceled && result.assets && result.assets[0]) {
-        handleInputChange('profilePicture', result.assets[0].uri);
+        const imageUri = result.assets[0].uri;
+        
+        try {
+          const uploadedUrl = await uploadImageToFirebase(imageUri);
+          handleInputChange('profilePicture', uploadedUrl);
+        } catch (error) {
+          Alert.alert('Error', 'Failed to process image. Please try again.');
+        }
       }
     } catch (error) {
       console.error('Error picking image:', error);
       Alert.alert('Error', 'Failed to select image. Please try again.');
     }
+  };
+
+  const removePhoto = () => {
+    // Set to generated avatar
+    const generatedAvatar = getUserAvatarUri({ 
+      name: userData.name, 
+      role: isHandyman ? 'handyman' : 'customer' 
+    });
+    handleInputChange('profilePicture', generatedAvatar);
   };
 
   const validateForm = () => {
@@ -227,6 +281,7 @@ const EditProfileScreen = ({ navigation }) => {
         email: userData.email.trim().toLowerCase(),
         phone: userData.phone.trim(),
         bio: userData.bio.trim(),
+        // FIXED: Ensure profilePicture is included in updates
         profilePicture: userData.profilePicture,
       };
 
@@ -237,11 +292,17 @@ const EditProfileScreen = ({ navigation }) => {
         updates.serviceCategories = userData.serviceCategories;
       }
 
+      console.log('🔄 Updating profile with:', updates);
+
       // Update in Firebase
       await userService.updateUserProfile(user.id, updates);
       
+      console.log('✅ Profile updated in Firebase');
+      
       // Update local auth context
       await updateUserProfile(updates);
+      
+      console.log('✅ Local auth context updated');
       
       Alert.alert(
         'Profile Updated',
@@ -249,7 +310,7 @@ const EditProfileScreen = ({ navigation }) => {
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error('❌ Error updating profile:', error);
       Alert.alert('Error', 'Failed to update profile. Please try again.');
     } finally {
       setIsSaving(false);
@@ -282,19 +343,22 @@ const EditProfileScreen = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Profile Photo */}
         <View style={styles.profilePhotoContainer}>
-          <TouchableOpacity onPress={handleSelectImage}>
+          <TouchableOpacity onPress={handleSelectImage} disabled={isUploadingImage}>
             <Image 
-              source={{ uri: getUserAvatarUri({ 
-                name: userData.name, 
-                profilePicture: userData.profilePicture,
-                role: isHandyman ? 'handyman' : 'customer'
-              }) }} 
+              source={{ uri: userData.profilePicture }} 
               style={styles.profilePhoto} 
             />
             <View style={styles.changePhotoButton}>
-              <Ionicons name="camera" size={16} color="#FFFFFF" />
+              {isUploadingImage ? (
+                <ActivityIndicator size={14} color="#FFFFFF" />
+              ) : (
+                <Ionicons name="camera" size={16} color="#FFFFFF" />
+              )}
             </View>
           </TouchableOpacity>
+          {isUploadingImage && (
+            <Text style={styles.uploadingText}>Uploading...</Text>
+          )}
         </View>
 
         {/* Basic Information */}
@@ -422,9 +486,9 @@ const EditProfileScreen = ({ navigation }) => {
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
           <TouchableOpacity
-            style={[styles.saveButton, isSaving && styles.disabledButton]}
+            style={[styles.saveButton, (isSaving || isUploadingImage) && styles.disabledButton]}
             onPress={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || isUploadingImage}
           >
             {isSaving ? (
               <View style={styles.loadingContainer}>
@@ -439,7 +503,7 @@ const EditProfileScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.discardButton}
             onPress={() => navigation.goBack()}
-            disabled={isSaving}
+            disabled={isSaving || isUploadingImage}
           >
             <Text style={styles.discardButtonText}>Cancel</Text>
           </TouchableOpacity>
@@ -496,6 +560,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#FFFFFF',
+  },
+  uploadingText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: Colors.textMedium,
   },
   section: {
     backgroundColor: '#FFFFFF',
