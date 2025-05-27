@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,71 +6,83 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView
+  SafeAreaView,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { userService } from '../services/userService';
+import { getUserAvatarUri } from '../utils/imageUtils';
 import Colors from '../constants/Colors';
 
 const HandymanDetailScreen = ({ route, navigation }) => {
-  // Get handyman data from route params
-  const { handyman } = route.params || {
-    handyman: {
-      id: '1',
-      name: 'Default Handyman',
-      profession: 'General',
-      rating: 4.5,
-      reviews: 0,
-      profilePicture: 'https://randomuser.me/api/portraits/men/1.jpg',
-      description: 'No description available.',
+  const { handyman: initialHandyman } = route.params || {};
+  const [handyman, setHandyman] = useState(initialHandyman);
+  const [isLoading, setIsLoading] = useState(!initialHandyman);
+  const [showFullDescription, setShowFullDescription] = useState(false);
+  const [reviews, setReviews] = useState([]);
+
+  useEffect(() => {
+    if (initialHandyman?.id) {
+      loadHandymanDetails();
+    }
+  }, [initialHandyman]);
+
+  const loadHandymanDetails = async () => {
+    if (!initialHandyman?.id) return;
+
+    try {
+      setIsLoading(true);
+      const handymanData = await userService.getUserById(initialHandyman.id);
+      if (handymanData) {
+        setHandyman(handymanData);
+      }
+      
+      // Load reviews (you would implement this service)
+      // const reviewsData = await reviewService.getUserReviews(initialHandyman.id);
+      // setReviews(reviewsData);
+      
+      // For now, use mock reviews
+      setReviews([
+        {
+          id: '1',
+          user: 'Sarah L.',
+          rating: 5,
+          date: '3 days ago',
+          comment: 'Excellent service! Very professional and completed the job quickly.',
+        },
+        {
+          id: '2',
+          user: 'James T.',
+          rating: 4,
+          date: '1 week ago',
+          comment: 'Good work overall, but took a little longer than expected.',
+        },
+      ]);
+    } catch (error) {
+      console.error('Error loading handyman details:', error);
+      Alert.alert('Error', 'Failed to load handyman details');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // State for read more functionality
-  const [showFullDescription, setShowFullDescription] = useState(false);
-  
-  // Sample price list - with both services and items
-  const priceList = [
-    { id: '1', type: 'service', name: 'Basic Inspection', price: 50 },
-    { id: '2', type: 'service', name: 'Simple Repair', price: 80 },
-    { id: '3', type: 'service', name: 'Standard Installation', price: 120 },
-    { id: '4', type: 'item', name: 'Pipe Fitting (each)', price: 15 },
-    { id: '5', type: 'item', name: 'Water Tap', price: 35 },
-    { id: '6', type: 'item', name: 'Sink Strainer', price: 20 },
-    { id: '7', type: 'service', name: 'Emergency Call-out', price: 200 },
-  ];
-  
-  // Sample reviews
-  const reviews = [
-    {
-      id: '1',
-      user: 'Sarah L.',
-      rating: 5,
-      date: '3 days ago',
-      comment: 'Excellent service! Very professional and completed the job quickly.',
-    },
-    {
-      id: '2',
-      user: 'James T.',
-      rating: 4,
-      date: '1 week ago',
-      comment: 'Good work overall, but took a little longer than expected.',
-    },
-  ];
-
-  // Function to handle hiring the handyman
   const handleHireNow = () => {
     navigation.navigate('ProjectBid', { handyman });
   };
 
-  // Function to message the handyman
   const handleMessage = () => {
-    navigation.navigate('ChatTab', { 
-      screen: 'Chat', 
-      params: { recipient: handyman }
-    });
+    try {
+      navigation.navigate('ChatTab', { 
+        screen: 'Chat', 
+        params: { recipient: handyman }
+      });
+    } catch (error) {
+      console.log('Chat navigation error:', error);
+      Alert.alert('Error', 'Chat feature is not available at the moment.');
+    }
   };
 
-  // Render rating stars
   const renderRatingStars = (rating) => {
     const fullStars = Math.floor(rating);
     const halfStar = rating % 1 >= 0.5;
@@ -86,14 +98,37 @@ const HandymanDetailScreen = ({ route, navigation }) => {
             style={{marginRight: 2}} 
           />
         ))}
-        <Text style={styles.ratingText}>{rating}</Text>
+        <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
       </View>
     );
   };
 
-  // Group price list by type
-  const services = priceList.filter(item => item.type === 'service');
-  const items = priceList.filter(item => item.type === 'item');
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Loading handyman details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!handyman) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Handyman not found</Text>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -101,13 +136,23 @@ const HandymanDetailScreen = ({ route, navigation }) => {
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <Image 
-            source={{ uri: handyman.profilePicture || handyman.avatar }} 
+            source={{ 
+              uri: getUserAvatarUri(handyman)
+            }} 
             style={styles.profileImage} 
           />
           <View style={styles.profileInfo}>
             <Text style={styles.name}>{handyman.name}</Text>
-            <Text style={styles.profession}>{handyman.profession}</Text>
-            {renderRatingStars(handyman.rating)}
+            {handyman.serviceCategories && handyman.serviceCategories.length > 0 && (
+              <Text style={styles.profession}>{handyman.serviceCategories[0]}</Text>
+            )}
+            {handyman.location && (
+              <Text style={styles.location}>{handyman.location}</Text>
+            )}
+            {renderRatingStars(handyman.rating || 0)}
+            <Text style={styles.reviewCount}>
+              {handyman.reviewCount || 0} review{(handyman.reviewCount || 0) !== 1 ? 's' : ''}
+            </Text>
           </View>
         </View>
 
@@ -124,81 +169,106 @@ const HandymanDetailScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Price List Section */}
+        {/* Professional Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pricing</Text>
+          <Text style={styles.sectionTitle}>Professional Details</Text>
           
-          {/* Services */}
-          <View style={styles.priceGroup}>
-            <Text style={styles.priceGroupTitle}>Services</Text>
-            {services.map(item => (
-              <View key={item.id} style={styles.priceItem}>
-                <Text style={styles.serviceText}>{item.name}</Text>
-                <Text style={styles.priceText}>RM {item.price}</Text>
-              </View>
-            ))}
-          </View>
-          
-          {/* Items */}
-          <View style={styles.priceGroup}>
-            <Text style={styles.priceGroupTitle}>Items</Text>
-            {items.map(item => (
-              <View key={item.id} style={styles.priceItem}>
-                <Text style={styles.serviceText}>{item.name}</Text>
-                <Text style={styles.priceText}>RM {item.price}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* About Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <Text 
-            style={styles.descriptionText} 
-            numberOfLines={showFullDescription ? undefined : 3}
-          >
-            {handyman.description || 'No description available.'}
-          </Text>
-          {handyman.description?.length > 100 && (
-            <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)}>
-              <Text style={styles.readMoreText}>
-                {showFullDescription ? 'Read less' : 'Read more'}
+          {handyman.experience && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Experience</Text>
+              <Text style={styles.detailValue}>
+                {handyman.experience} year{handyman.experience !== 1 ? 's' : ''}
               </Text>
-            </TouchableOpacity>
+            </View>
+          )}
+
+          {handyman.hourlyRate && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Hourly Rate</Text>
+              <Text style={styles.detailValue}>RM {handyman.hourlyRate}</Text>
+            </View>
+          )}
+
+          {handyman.completedJobs && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Jobs Completed</Text>
+              <Text style={styles.detailValue}>{handyman.completedJobs}</Text>
+            </View>
           )}
         </View>
+
+        {/* Service Categories */}
+        {handyman.serviceCategories && handyman.serviceCategories.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Services Offered</Text>
+            <View style={styles.categoriesContainer}>
+              {handyman.serviceCategories.map((category, index) => (
+                <View key={index} style={styles.categoryChip}>
+                  <Text style={styles.categoryText}>{category}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* About Section */}
+        {handyman.bio && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>About</Text>
+            <Text 
+              style={styles.descriptionText} 
+              numberOfLines={showFullDescription ? undefined : 3}
+            >
+              {handyman.bio}
+            </Text>
+            {handyman.bio.length > 100 && (
+              <TouchableOpacity onPress={() => setShowFullDescription(!showFullDescription)}>
+                <Text style={styles.readMoreText}>
+                  {showFullDescription ? 'Read less' : 'Read more'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {/* Reviews Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Reviews</Text>
           
-          {reviews.map(review => (
-            <View key={review.id} style={styles.reviewCard}>
-              <View style={styles.reviewHeader}>
-                <Text style={styles.reviewerName}>{review.user}</Text>
-                <Text style={styles.reviewDate}>{review.date}</Text>
-              </View>
+          {reviews.length > 0 ? (
+            <>
+              {reviews.map(review => (
+                <View key={review.id} style={styles.reviewCard}>
+                  <View style={styles.reviewHeader}>
+                    <Text style={styles.reviewerName}>{review.user}</Text>
+                    <Text style={styles.reviewDate}>{review.date}</Text>
+                  </View>
+                  
+                  <View style={styles.ratingRow}>
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <Ionicons 
+                        key={i} 
+                        name={i <= review.rating ? "star" : "star-outline"} 
+                        size={14} 
+                        color="#FFD700" 
+                        style={{marginRight: 2}} 
+                      />
+                    ))}
+                  </View>
+                  
+                  <Text style={styles.reviewText}>{review.comment}</Text>
+                </View>
+              ))}
               
-              <View style={styles.ratingRow}>
-                {[1, 2, 3, 4, 5].map(i => (
-                  <Ionicons 
-                    key={i} 
-                    name={i <= review.rating ? "star" : "star-outline"} 
-                    size={14} 
-                    color="#FFD700" 
-                    style={{marginRight: 2}} 
-                  />
-                ))}
-              </View>
-              
-              <Text style={styles.reviewText}>{review.comment}</Text>
+              <TouchableOpacity style={styles.viewAllButton}>
+                <Text style={styles.viewAllText}>View All Reviews</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={styles.noReviews}>
+              <Text style={styles.noReviewsText}>No reviews yet</Text>
             </View>
-          ))}
-          
-          <TouchableOpacity style={styles.viewAllButton}>
-            <Text style={styles.viewAllText}>View All Reviews</Text>
-          </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -209,6 +279,38 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F8F8',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: Colors.textMedium,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: Colors.error,
+    marginBottom: 20,
+  },
+  backButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   profileHeader: {
     flexDirection: 'row',
@@ -227,6 +329,7 @@ const styles = StyleSheet.create({
   profileInfo: {
     marginLeft: 15,
     justifyContent: 'center',
+    flex: 1,
   },
   name: {
     fontSize: 18,
@@ -237,17 +340,26 @@ const styles = StyleSheet.create({
   profession: {
     fontSize: 14,
     color: '#666666',
+    marginBottom: 2,
+  },
+  location: {
+    fontSize: 14,
+    color: '#666666',
     marginBottom: 6,
   },
   starsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   ratingText: {
     fontSize: 14,
     color: '#666666',
     marginLeft: 5,
+  },
+  reviewCount: {
+    fontSize: 12,
+    color: '#999999',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -291,33 +403,38 @@ const styles = StyleSheet.create({
     color: '#333333',
     marginBottom: 12,
   },
-  priceGroup: {
-    marginBottom: 15,
-  },
-  priceGroupTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#555555',
-    marginBottom: 8,
-    paddingBottom: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  priceItem: {
+  detailItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  serviceText: {
+  detailLabel: {
     fontSize: 14,
-    color: '#444444',
+    color: '#666666',
   },
-  priceText: {
+  detailValue: {
     fontSize: 14,
     fontWeight: 'bold',
     color: Colors.primary,
+  },
+  categoriesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  categoryChip: {
+    backgroundColor: Colors.highlight,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  categoryText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '500',
   },
   descriptionText: {
     fontSize: 14,
@@ -366,6 +483,14 @@ const styles = StyleSheet.create({
   viewAllText: {
     color: Colors.primary,
     fontWeight: '500',
+  },
+  noReviews: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  noReviewsText: {
+    fontSize: 14,
+    color: '#999999',
   },
 });
 

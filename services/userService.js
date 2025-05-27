@@ -1,4 +1,4 @@
-// services/userService.js
+// services/userService.js - Fixed version with optional rating field
 import { db } from '../firebase';
 import firebase from 'firebase/compat/app';
 
@@ -37,9 +37,11 @@ export const userService = {
         return {
           id: doc.id,
           ...userData,
-          // Convert timestamps to ISO strings
-          createdAt: userData.createdAt?.toDate()?.toISOString(),
-          updatedAt: userData.updatedAt?.toDate()?.toISOString(),
+          // Safely convert timestamps to ISO strings
+          createdAt: userData.createdAt?.toDate ? userData.createdAt.toDate().toISOString() : null,
+          updatedAt: userData.updatedAt?.toDate ? userData.updatedAt.toDate().toISOString() : null,
+          lastActiveAt: userData.lastActiveAt?.toDate ? userData.lastActiveAt.toDate().toISOString() : null,
+          deactivatedAt: userData.deactivatedAt?.toDate ? userData.deactivatedAt.toDate().toISOString() : null,
         };
       }
       return null;
@@ -65,10 +67,49 @@ export const userService = {
     }
   },
 
+  // Get top rated handymen - FIXED VERSION
+  getTopRatedHandymen: async (limit = 10) => {
+    try {
+      // First, get all active handymen (without orderBy rating to avoid requiring rating field)
+      const snapshot = await db.collection('users')
+        .where('role', '==', 'handyman')
+        .where('isActive', '==', true)
+        .limit(limit * 2) // Get more to allow for sorting
+        .get();
+
+      const handymen = snapshot.docs.map(doc => {
+        const userData = doc.data();
+        return {
+          id: doc.id,
+          ...userData,
+          // Ensure rating exists, default to 0 if missing
+          rating: userData.rating || 0,
+          reviewCount: userData.reviewCount || 0,
+          createdAt: userData.createdAt?.toDate ? userData.createdAt.toDate().toISOString() : null,
+          updatedAt: userData.updatedAt?.toDate ? userData.updatedAt.toDate().toISOString() : null,
+        };
+      });
+
+      // Sort by rating in JavaScript, then by reviewCount as tiebreaker
+      const sortedHandymen = handymen.sort((a, b) => {
+        if (b.rating !== a.rating) {
+          return b.rating - a.rating; // Higher rating first
+        }
+        return (b.reviewCount || 0) - (a.reviewCount || 0); // More reviews as tiebreaker
+      });
+
+      // Return only the requested limit
+      return sortedHandymen.slice(0, limit);
+    } catch (error) {
+      console.error('Error getting top rated handymen:', error);
+      throw error;
+    }
+  },
+
   // Search handymen by criteria
   searchHandymen: async (searchCriteria = {}) => {
     try {
-      let query = db.collection('users').where('role', '==', 'handyman');
+      let query = db.collection('users').where('role', '==', 'handyman').where('isActive', '==', true);
       
       // Apply filters
       if (searchCriteria.category) {
@@ -76,25 +117,32 @@ export const userService = {
       }
       
       if (searchCriteria.location) {
-        // For location search, we might need to implement geo-queries
-        // For now, we'll do a simple text match
         query = query.where('location', '>=', searchCriteria.location)
                     .where('location', '<=', searchCriteria.location + '\uf8ff');
       }
       
-      if (searchCriteria.minRating) {
-        query = query.where('rating', '>=', searchCriteria.minRating);
-      }
-      
       const snapshot = await query.get();
       
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        // Convert timestamps to ISO strings
-        createdAt: doc.data().createdAt?.toDate()?.toISOString(),
-        updatedAt: doc.data().updatedAt?.toDate()?.toISOString(),
-      }));
+      const handymen = snapshot.docs.map(doc => {
+        const userData = doc.data();
+        return {
+          id: doc.id,
+          ...userData,
+          rating: userData.rating || 0,
+          reviewCount: userData.reviewCount || 0,
+          createdAt: userData.createdAt?.toDate ? userData.createdAt.toDate().toISOString() : null,
+          updatedAt: userData.updatedAt?.toDate ? userData.updatedAt.toDate().toISOString() : null,
+        };
+      });
+
+      // Filter by minRating if specified, then sort
+      let filteredHandymen = handymen;
+      if (searchCriteria.minRating) {
+        filteredHandymen = handymen.filter(h => (h.rating || 0) >= searchCriteria.minRating);
+      }
+
+      // Sort by rating
+      return filteredHandymen.sort((a, b) => (b.rating || 0) - (a.rating || 0));
     } catch (error) {
       console.error('Error searching handymen:', error);
       throw error;
@@ -108,41 +156,24 @@ export const userService = {
         .where('role', '==', 'handyman')
         .where('serviceCategories', 'array-contains', category)
         .where('isActive', '==', true)
-        .orderBy('rating', 'desc')
         .get();
 
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        // Convert timestamps to ISO strings
-        createdAt: doc.data().createdAt?.toDate()?.toISOString(),
-        updatedAt: doc.data().updatedAt?.toDate()?.toISOString(),
-      }));
+      const handymen = snapshot.docs.map(doc => {
+        const userData = doc.data();
+        return {
+          id: doc.id,
+          ...userData,
+          rating: userData.rating || 0,
+          reviewCount: userData.reviewCount || 0,
+          createdAt: userData.createdAt?.toDate ? userData.createdAt.toDate().toISOString() : null,
+          updatedAt: userData.updatedAt?.toDate ? userData.updatedAt.toDate().toISOString() : null,
+        };
+      });
+
+      // Sort by rating
+      return handymen.sort((a, b) => (b.rating || 0) - (a.rating || 0));
     } catch (error) {
       console.error('Error getting handymen by category:', error);
-      throw error;
-    }
-  },
-
-  // Get top rated handymen
-  getTopRatedHandymen: async (limit = 10) => {
-    try {
-      const snapshot = await db.collection('users')
-        .where('role', '==', 'handyman')
-        .where('isActive', '==', true)
-        .orderBy('rating', 'desc')
-        .limit(limit)
-        .get();
-
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        // Convert timestamps to ISO strings
-        createdAt: doc.data().createdAt?.toDate()?.toISOString(),
-        updatedAt: doc.data().updatedAt?.toDate()?.toISOString(),
-      }));
-    } catch (error) {
-      console.error('Error getting top rated handymen:', error);
       throw error;
     }
   },
@@ -194,9 +225,10 @@ export const userService = {
         return {
           id: doc.id,
           ...userData,
-          // Convert timestamps to ISO strings
-          createdAt: userData.createdAt?.toDate()?.toISOString(),
-          updatedAt: userData.updatedAt?.toDate()?.toISOString(),
+          rating: userData.rating || 0,
+          reviewCount: userData.reviewCount || 0,
+          createdAt: userData.createdAt?.toDate ? userData.createdAt.toDate().toISOString() : null,
+          updatedAt: userData.updatedAt?.toDate ? userData.updatedAt.toDate().toISOString() : null,
         };
       }
       return null;

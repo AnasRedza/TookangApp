@@ -8,118 +8,101 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
-  Alert
+  Alert,
+  SafeAreaView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
+import { projectService } from '../services/projectService';
+import { userService } from '../services/userService';
+import { getUserAvatarUri } from '../utils/imageUtils';
 import Colors from '../constants/Colors';
 
 const HandymanHomeScreen = ({ navigation }) => {
+  const { user } = useAuth();
   const [jobs, setJobs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
   
-  // Mock data for available jobs
-  const MOCK_JOBS = [
-    {
-      id: '1',
-      title: 'Fix Leaking Kitchen Sink',
-      description: 'The kitchen sink has been leaking for a week and needs repair.',
-      location: 'Kuala Lumpur',
-      budget: 'RM120-RM180',
-      customerName: 'Sarah Wong',
-      customerRating: 4.8,
-      postedDate: '2 days ago',
-      category: 'Plumbing',
-      distance: '3.5 km',
-      status: 'open',
-    },
-    {
-      id: '2',
-      title: 'Ceiling Fan Installation',
-      description: 'Need someone to install 3 ceiling fans in a new apartment.',
-      location: 'Petaling Jaya',
-      budget: 'RM200-RM300',
-      customerName: 'Michael Tan',
-      customerRating: 4.2,
-      postedDate: '5 hours ago',
-      category: 'Electrical',
-      distance: '5.1 km',
-      status: 'open',
-    },
-    {
-      id: '3',
-      title: 'Bathroom Tile Repair',
-      description: 'Several tiles in the bathroom have cracked and need replacement.',
-      location: 'Subang Jaya',
-      budget: 'RM250-RM350',
-      customerName: 'Ahmad Ismail',
-      customerRating: 4.5,
-      postedDate: '1 day ago',
-      category: 'Tiling',
-      distance: '7.2 km',
-      status: 'open',
-    },
-    {
-      id: '4',
-      title: 'Paint Living Room Walls',
-      description: 'Need painting service for living room (approx 400 sq ft).',
-      location: 'Shah Alam',
-      budget: 'RM500-RM700',
-      customerName: 'Lily Chen',
-      customerRating: 4.9,
-      postedDate: '3 days ago',
-      category: 'Painting',
-      distance: '12.4 km',
-      status: 'open',
-    },
-    {
-      id: '5',
-      title: 'Build Bookshelf',
-      description: 'Looking for someone to build a custom bookshelf (6ft x 4ft).',
-      location: 'Ampang',
-      budget: 'RM400-RM600',
-      customerName: 'David Lee',
-      customerRating: 4.7,
-      postedDate: '1 day ago',
-      category: 'Carpentry',
-      distance: '8.7 km',
-      status: 'open',
-    },
-    {
-      id: '6',
-      title: 'Deep Clean Apartment',
-      description: 'Need deep cleaning for 2-bedroom apartment before move-in.',
-      location: 'Cheras',
-      budget: 'RM300-RM450',
-      customerName: 'Priya Nair',
-      customerRating: 4.6,
-      postedDate: '6 hours ago',
-      category: 'Cleaning',
-      distance: '10.3 km',
-      status: 'open',
-    },
-  ];
-  
-  // Load jobs on component mount
   useEffect(() => {
-    // In a real app, this would be an API call
-    setTimeout(() => {
-      setJobs(MOCK_JOBS);
-      setIsLoading(false);
-    }, 1000);
+    loadAvailableJobs();
+    
+    // Set up real-time listener for open projects
+    const unsubscribe = projectService.subscribeToOpenProjects(
+      (projects) => {
+        enrichProjectsWithCustomerData(projects);
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Error in projects subscription:', error);
+        setError('Failed to load projects');
+        setIsLoading(false);
+      }
+    );
+    
+    return () => unsubscribe && unsubscribe();
   }, []);
-  
-  // Handle refresh
-  const onRefresh = () => {
-    setRefreshing(true);
-    // In a real app, this would refresh data from API
-    setTimeout(() => {
-      setJobs(MOCK_JOBS);
-      setRefreshing(false);
-    }, 1000);
+
+  const loadAvailableJobs = async () => {
+    try {
+      setError(null);
+      const openProjects = await projectService.getOpenProjects();
+      await enrichProjectsWithCustomerData(openProjects);
+    } catch (error) {
+      console.error('Error loading jobs:', error);
+      setError('Failed to load available jobs');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const enrichProjectsWithCustomerData = async (projects) => {
+    try {
+      const enrichedProjects = await Promise.all(
+        projects.map(async (project) => {
+          try {
+            if (project.customerId) {
+              const customer = await userService.getUserById(project.customerId);
+              return {
+                ...project,
+                customer: customer,
+                customerName: customer?.name || project.customerName || 'Unknown Customer',
+                customerRating: customer?.rating || 4.5,
+                customerAvatar: getUserAvatarUri(customer)
+              };
+            }
+            return {
+              ...project,
+              customerName: project.customerName || 'Unknown Customer',
+              customerRating: project.customerRating || 4.5,
+              customerAvatar: getUserAvatarUri({ name: project.customerName || 'Customer' })
+            };
+          } catch (error) {
+            console.error('Error enriching project:', error);
+            return {
+              ...project,
+              customerName: project.customerName || 'Unknown Customer',
+              customerRating: 4.5,
+              customerAvatar: getUserAvatarUri({ name: 'Customer' })
+            };
+          }
+        })
+      );
+      
+      setJobs(enrichedProjects);
+    } catch (error) {
+      console.error('Error enriching projects:', error);
+      setJobs(projects);
+    }
   };
   
-  // Navigate to project details
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadAvailableJobs();
+    setRefreshing(false);
+  };
+  
   const navigateToProjectDetails = (project, status = 'viewing') => {
     navigation.navigate('ProjectDetails', { 
       projectId: project.id,
@@ -129,8 +112,7 @@ const HandymanHomeScreen = ({ navigation }) => {
     });
   };
   
-  // Handle handyman responses to jobs
-  const handleAcceptJob = (project) => {
+  const handleAcceptJob = async (project) => {
     Alert.alert(
       "Accept Project",
       "Are you sure you want to accept this project with the customer's budget?",
@@ -138,15 +120,26 @@ const HandymanHomeScreen = ({ navigation }) => {
         { text: "Cancel", style: "cancel" },
         { 
           text: "Accept", 
-          onPress: () => {
-            Alert.alert(
-              "Project Accepted",
-              "You have accepted this project. The customer will be notified.",
-              [{ 
-                text: "OK",
-                onPress: () => navigateToProjectDetails(project, 'accepted')
-              }]
-            );
+          onPress: async () => {
+            try {
+              await projectService.assignHandymanToProject(
+                project.id, 
+                user.id, 
+                project.initialBudget || extractBudgetAmount(project.budget)
+              );
+              
+              Alert.alert(
+                "Project Accepted",
+                "You have accepted this project. The customer will be notified.",
+                [{ 
+                  text: "OK",
+                  onPress: () => navigateToProjectDetails(project, 'accepted')
+                }]
+              );
+            } catch (error) {
+              console.error('Error accepting project:', error);
+              Alert.alert("Error", "Failed to accept project. Please try again.");
+            }
           }
         }
       ]
@@ -154,12 +147,17 @@ const HandymanHomeScreen = ({ navigation }) => {
   };
   
   const handleNegotiateJob = (project) => {
-    navigation.navigate('ProjectOffer', { 
-      projectId: project.id,
-      project: project,
-      mode: 'negotiate',
-      viewMode: 'handyman'
-    });
+    try {
+      navigation.navigate('ProjectOffer', { 
+        projectId: project.id,
+        project: project,
+        mode: 'negotiate',
+        viewMode: 'handyman'
+      });
+    } catch (error) {
+      console.log("Navigation error:", error);
+      Alert.alert("Navigation Error", "Could not open negotiation screen.");
+    }
   };
   
   const handleDeclineJob = (projectId) => {
@@ -172,14 +170,40 @@ const HandymanHomeScreen = ({ navigation }) => {
           text: "Decline", 
           style: "destructive",
           onPress: () => {
+            // Remove from local state
             setJobs(prevJobs => prevJobs.filter(job => job.id !== projectId));
           }
         }
       ]
     );
   };
+
+  const extractBudgetAmount = (budgetString) => {
+    if (!budgetString) return 100;
+    const match = budgetString.match(/RM(\d+)/);
+    return match && match[1] ? parseInt(match[1]) : 100;
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Not specified';
+    try {
+      const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    } catch (error) {
+      return 'Not specified';
+    }
+  };
+
+  const formatBudget = (project) => {
+    if (project.initialBudget) {
+      return `RM ${project.initialBudget}${project.isNegotiable ? ' (Negotiable)' : ''}`;
+    }
+    if (project.budget) {
+      return project.budget;
+    }
+    return 'Budget not specified';
+  };
   
-  // Render job item
   const renderJobItem = ({ item }) => (
     <View style={styles.jobCard}>
       <TouchableOpacity 
@@ -188,8 +212,9 @@ const HandymanHomeScreen = ({ navigation }) => {
         activeOpacity={0.7}
       >
         <View style={styles.jobHeader}>
-          <Text style={styles.categoryChip}>{item.category}</Text>
-          <Text style={styles.distance}>{item.distance}</Text>
+          <View style={styles.categoryChip}>
+            <Text style={styles.categoryText}>{item.category}</Text>
+          </View>
         </View>
         
         <Text style={styles.jobTitle}>{item.title}</Text>
@@ -202,20 +227,32 @@ const HandymanHomeScreen = ({ navigation }) => {
           </View>
           <View style={styles.detailItem}>
             <Ionicons name="cash-outline" size={16} color={Colors.primary} />
-            <Text style={styles.detailText}>{item.budget}</Text>
+            <Text style={styles.detailText}>{formatBudget(item)}</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Ionicons name="calendar-outline" size={16} color={Colors.primary} />
+            <Text style={styles.detailText}>{formatDate(item.preferredDate)}</Text>
           </View>
           <View style={styles.detailItem}>
             <Ionicons name="time-outline" size={16} color={Colors.primary} />
-            <Text style={styles.detailText}>{item.postedDate}</Text>
+            <Text style={styles.detailText}>
+              {new Date(item.createdAt).toLocaleDateString()}
+            </Text>
           </View>
         </View>
         
         <View style={styles.customerInfo}>
           <Image 
-            source={{ uri: `https://randomuser.me/api/portraits/${item.customerName.includes('Sarah') || item.customerName.includes('Lily') || item.customerName.includes('Priya') ? 'women' : 'men'}/${parseInt(item.id) + 30}.jpg` }}
+            source={{ uri: item.customerAvatar }}
             style={styles.customerAvatar}
           />
-          <Text style={styles.customerName}>{item.customerName}</Text>
+          <View style={styles.customerDetails}>
+            <Text style={styles.customerName}>{item.customerName}</Text>
+            <View style={styles.ratingContainer}>
+              <Ionicons name="star" size={12} color="#FFD700" />
+              <Text style={styles.ratingText}>{item.customerRating?.toFixed(1) || '4.5'}</Text>
+            </View>
+          </View>
         </View>
       </TouchableOpacity>
       
@@ -249,20 +286,48 @@ const HandymanHomeScreen = ({ navigation }) => {
       </View>
     </View>
   );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="briefcase-outline" size={60} color={Colors.textLight} />
+      <Text style={styles.emptyTitle}>No Projects Available</Text>
+      <Text style={styles.emptyText}>There are no open projects at the moment.</Text>
+      <Text style={styles.emptySubText}>Pull down to refresh</Text>
+    </View>
+  );
+
+  const renderErrorState = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="alert-circle-outline" size={60} color={Colors.error} />
+      <Text style={styles.emptyTitle}>Something went wrong</Text>
+      <Text style={styles.emptyText}>{error}</Text>
+      <TouchableOpacity style={styles.retryButton} onPress={loadAvailableJobs}>
+        <Text style={styles.retryButtonText}>Try Again</Text>
+      </TouchableOpacity>
+    </View>
+  );
   
-  // Show loading indicator while data loads
-  if (isLoading) {
+  if (isLoading && !refreshing) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Finding available projects...</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Finding available projects...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error && !refreshing) {
+    return (
+      <SafeAreaView style={styles.container}>
+        {renderErrorState()}
+      </SafeAreaView>
     );
   }
   
   return (
-    <View style={styles.container}>
-      {/* Jobs list */}
+    <SafeAreaView style={styles.container}>
       <FlatList
         data={jobs}
         renderItem={renderJobItem}
@@ -276,15 +341,9 @@ const HandymanHomeScreen = ({ navigation }) => {
             colors={[Colors.primary]}
           />
         }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="briefcase-outline" size={60} color={Colors.textLight} />
-            <Text style={styles.emptyText}>No projects available</Text>
-            <Text style={styles.emptySubText}>Pull down to refresh</Text>
-          </View>
-        }
+        ListEmptyComponent={renderEmptyState}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -338,9 +397,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 4,
   },
-  distance: {
+  categoryText: {
     fontSize: 12,
-    color: Colors.textMedium,
+    fontWeight: 'bold',
+    color: Colors.primary,
   },
   jobTitle: {
     fontSize: 17,
@@ -362,18 +422,15 @@ const styles = StyleSheet.create({
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
     marginBottom: 4,
+    width: '45%',
   },
   detailText: {
     fontSize: 13,
     color: Colors.textMedium,
     marginLeft: 4,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginVertical: 12,
+    flex: 1,
   },
   customerInfo: {
     flexDirection: 'row',
@@ -385,12 +442,29 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     marginRight: 12,
   },
+  customerDetails: {
+    flex: 1,
+  },
   customerName: {
     fontSize: 14,
     fontWeight: '500',
     color: Colors.textDark,
   },
-  // Action buttons
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  ratingText: {
+    fontSize: 12,
+    color: Colors.textMedium,
+    marginLeft: 2,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 12,
+  },
   actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -440,18 +514,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 40,
+    minHeight: 400,
   },
-  emptyText: {
-    fontSize: 16,
+  emptyTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: Colors.textMedium,
     marginTop: 12,
   },
-  emptySubText: {
+  emptyText: {
     fontSize: 14,
     color: Colors.textLight,
     marginTop: 8,
     textAlign: 'center',
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: Colors.textLight,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

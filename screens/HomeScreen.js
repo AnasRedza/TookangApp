@@ -7,90 +7,97 @@ import {
   Image,
   SafeAreaView,
   FlatList,
-  StatusBar
+  StatusBar,
+  ActivityIndicator,
+  RefreshControl,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { userService } from '../services/userService';
+import { getUserAvatarUri } from '../utils/imageUtils';
 import Colors from '../constants/Colors';
 
 // Updated categories - only 5 as requested
 const CATEGORIES = [
-  { id: '1', name: 'Plumber', icon: 'water-outline' },
-  { id: '2', name: 'Electrician', icon: 'flash-outline' },
-  { id: '3', name: 'Painter', icon: 'color-palette-outline' },
-  { id: '4', name: 'Cleaner', icon: 'sparkles-outline' },
+  { id: '1', name: 'Plumbing', icon: 'water-outline' },
+  { id: '2', name: 'Electrical', icon: 'flash-outline' },
+  { id: '3', name: 'Painting', icon: 'color-palette-outline' },
+  { id: '4', name: 'Cleaning', icon: 'sparkles-outline' },
   { id: '5', name: 'Others', icon: 'apps-outline' }
-];
-
-const HANDYMEN = [
-  {
-    id: '1',
-    name: 'John Smith',
-    profession: 'Plumber',
-    rating: 4.8,
-    hourlyRate: 45,
-    profilePicture: 'https://randomuser.me/api/portraits/men/32.jpg',
-  },
-  {
-    id: '2',
-    name: 'Michael Johnson',
-    profession: 'Electrician',
-    rating: 4.7,
-    hourlyRate: 50,
-    profilePicture: 'https://randomuser.me/api/portraits/men/36.jpg',
-  },
-  {
-    id: '3',
-    name: 'Sarah Williams',
-    profession: 'Painter',
-    rating: 4.9,
-    hourlyRate: 40,
-    profilePicture: 'https://randomuser.me/api/portraits/women/44.jpg',
-  },
-  {
-    id: '4',
-    name: 'Robert Brown',
-    profession: 'Carpenter',
-    rating: 4.6,
-    hourlyRate: 55,
-    profilePicture: 'https://randomuser.me/api/portraits/men/46.jpg',
-  },
-  {
-    id: '5',
-    name: 'Emily Davis',
-    profession: 'Cleaner',
-    rating: 4.8,
-    hourlyRate: 35,
-    profilePicture: 'https://randomuser.me/api/portraits/women/28.jpg',
-  }
 ];
 
 const HomeScreen = ({ navigation }) => {
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [handymen, setHandymen] = useState(HANDYMEN);
+  const [handymen, setHandymen] = useState([]);
+  const [allHandymen, setAllHandymen] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // Load handymen data on component mount
+  useEffect(() => {
+    loadHandymen();
+  }, []);
   
   // Filter handymen when category changes
   useEffect(() => {
-    if (selectedCategory) {
-      const category = CATEGORIES.find(c => c.id === selectedCategory);
-      if (category) {
-        if (category.name === 'Others') {
-          // For 'Others' category, show all handymen not matching other specific categories
-          const specificProfessions = ['Plumber', 'Electrician', 'Painter', 'Cleaner'];
-          const filtered = HANDYMEN.filter(
-            handyman => !specificProfessions.includes(handyman.profession)
-          );
-          setHandymen(filtered);
-        } else {
-          const filtered = HANDYMEN.filter(
-            handyman => handyman.profession.toLowerCase() === category.name.toLowerCase()
-          );
-          setHandymen(filtered);
-        }
-      }
-    } else {
-      setHandymen(HANDYMEN);
+    filterHandymenByCategory();
+  }, [selectedCategory, allHandymen]);
+
+ const loadHandymen = async () => {
+  try {
+    setError(null);
+    console.log('🔍 Loading handymen...');
+    const handymenData = await userService.getTopRatedHandymen(20);
+    console.log('📊 Handymen loaded:', handymenData.length);
+    console.log('👥 First handyman:', handymenData[0]);
+    setAllHandymen(handymenData);
+    setHandymen(handymenData);
+  } catch (error) {
+    console.error('❌ Error loading handymen:', error);
+    setError('Failed to load handymen. Please try again.');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadHandymen();
+    setRefreshing(false);
+  };
+
+  const filterHandymenByCategory = () => {
+    if (!selectedCategory) {
+      setHandymen(allHandymen);
+      return;
     }
-  }, [selectedCategory]);
+
+    const category = CATEGORIES.find(c => c.id === selectedCategory);
+    if (!category) {
+      setHandymen(allHandymen);
+      return;
+    }
+
+    if (category.name === 'Others') {
+      // For 'Others' category, show handymen with categories not in the main list
+      const mainCategories = ['Plumbing', 'Electrical', 'Painting', 'Cleaning'];
+      const filtered = allHandymen.filter(handyman => {
+        if (!handyman.serviceCategories || handyman.serviceCategories.length === 0) {
+          return true; // Include handymen with no categories
+        }
+        return !handyman.serviceCategories.some(cat => mainCategories.includes(cat));
+      });
+      setHandymen(filtered);
+    } else {
+      // Filter by specific category
+      const filtered = allHandymen.filter(handyman => {
+        return handyman.serviceCategories && 
+               handyman.serviceCategories.includes(category.name);
+      });
+      setHandymen(filtered);
+    }
+  };
 
   const handleCategoryPress = (categoryId) => {
     setSelectedCategory(selectedCategory === categoryId ? null : categoryId);
@@ -130,23 +137,98 @@ const HomeScreen = ({ navigation }) => {
       onPress={() => handleHandymanPress(item)}
     >
       <Image
-        source={{ uri: item.profilePicture }}
+        source={{ uri: getUserAvatarUri(item) }}
         style={styles.handymanImage}
       />
       <View style={styles.handymanInfo}>
         <Text style={styles.handymanName}>{item.name}</Text>
-        <Text style={styles.handymanProfession}>{item.profession}</Text>
+        <Text style={styles.handymanLocation}>
+          {item.location || 'Malaysia'}
+        </Text>
+        <View style={styles.categoriesContainer}>
+          {item.serviceCategories && item.serviceCategories.slice(0, 2).map((category, index) => (
+            <View key={index} style={styles.categoryTag}>
+              <Text style={styles.categoryTagText}>{category}</Text>
+            </View>
+          ))}
+          {item.serviceCategories && item.serviceCategories.length > 2 && (
+            <View style={styles.categoryTag}>
+              <Text style={styles.categoryTagText}>+{item.serviceCategories.length - 2}</Text>
+            </View>
+          )}
+        </View>
         <View style={styles.handymanBottom}>
           <View style={styles.ratingContainer}>
             <Ionicons name="star" size={14} color="#FFD700" />
-            <Text style={styles.ratingText}>{item.rating}</Text>
+            <Text style={styles.ratingText}>
+              {item.rating ? item.rating.toFixed(1) : '0.0'}
+            </Text>
+            <Text style={styles.reviewsText}>
+              ({item.reviewCount || 0})
+            </Text>
           </View>
-          <Text style={styles.priceText}>RM {item.hourlyRate}/hr</Text>
+          {item.hourlyRate && (
+            <Text style={styles.priceText}>RM {item.hourlyRate}/hr</Text>
+          )}
         </View>
       </View>
       <Ionicons name="chevron-forward" size={20} color="#CCCCCC" style={styles.chevron} />
     </TouchableOpacity>
   );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Ionicons name="search-outline" size={64} color="#CCCCCC" />
+      <Text style={styles.emptyStateTitle}>No handymen found</Text>
+      <Text style={styles.emptyStateText}>
+        {selectedCategory 
+          ? `No handymen available for ${CATEGORIES.find(c => c.id === selectedCategory)?.name}`
+          : 'No handymen available at the moment'
+        }
+      </Text>
+      <TouchableOpacity 
+        style={styles.resetButton}
+        onPress={() => setSelectedCategory(null)}
+      >
+        <Text style={styles.resetButtonText}>Show All</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderErrorState = () => (
+    <View style={styles.errorState}>
+      <Ionicons name="alert-circle-outline" size={64} color={Colors.error} />
+      <Text style={styles.errorTitle}>Something went wrong</Text>
+      <Text style={styles.errorText}>{error}</Text>
+      <TouchableOpacity 
+        style={styles.retryButton}
+        onPress={loadHandymen}
+      >
+        <Text style={styles.retryButtonText}>Try Again</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Loading handymen...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error && !refreshing) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+        {renderErrorState()}
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -169,27 +251,24 @@ const HomeScreen = ({ navigation }) => {
         <Text style={styles.sectionTitle}>
           {selectedCategory 
             ? `${CATEGORIES.find(c => c.id === selectedCategory)?.name} Services` 
-            : 'All Services'}
+            : 'Available Services'}
         </Text>
         
-        {handymen.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No handymen found</Text>
-            <TouchableOpacity 
-              style={styles.resetButton}
-              onPress={() => setSelectedCategory(null)}
-            >
-              <Text style={styles.resetButtonText}>Show All</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <FlatList
-            data={handymen}
-            renderItem={renderHandymanItem}
-            keyExtractor={item => item.id}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
+        <FlatList
+          data={handymen}
+          renderItem={renderHandymanItem}
+          keyExtractor={item => item.id}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[Colors.primary]}
+            />
+          }
+          ListEmptyComponent={renderEmptyState}
+          contentContainerStyle={handymen.length === 0 ? styles.emptyListContainer : null}
+        />
       </View>
     </SafeAreaView>
   );
@@ -199,6 +278,47 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: Colors.textMedium,
+  },
+  errorState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 16,
+    color: Colors.textMedium,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   categorySection: {
     paddingVertical: 15,
@@ -249,11 +369,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#F0F0F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   handymanImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
   },
   handymanInfo: {
     flex: 1,
@@ -264,15 +389,31 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333333',
   },
-  handymanProfession: {
+  handymanLocation: {
     fontSize: 14,
     color: '#666666',
     marginTop: 2,
   },
+  categoriesContainer: {
+    flexDirection: 'row',
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  categoryTag: {
+    backgroundColor: Colors.highlight,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginRight: 4,
+  },
+  categoryTagText: {
+    fontSize: 10,
+    color: Colors.primary,
+    fontWeight: '500',
+  },
   handymanBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 6,
     alignItems: 'center',
   },
   ratingContainer: {
@@ -283,6 +424,12 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontSize: 14,
     color: '#666666',
+    fontWeight: '500',
+  },
+  reviewsText: {
+    marginLeft: 2,
+    fontSize: 12,
+    color: '#999999',
   },
   priceText: {
     fontSize: 14,
@@ -292,15 +439,27 @@ const styles = StyleSheet.create({
   chevron: {
     marginLeft: 8,
   },
+  emptyListContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 30,
+    padding: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginTop: 16,
+    marginBottom: 8,
   },
   emptyStateText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666666',
-    marginBottom: 15,
+    textAlign: 'center',
+    marginBottom: 20,
   },
   resetButton: {
     backgroundColor: Colors.primary,

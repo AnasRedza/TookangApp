@@ -1,6 +1,8 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth, db } from '../firebase';
+import { userService } from '../services/userService';
+import { getUserAvatarUri } from '../utils/imageUtils';
 
 const AuthContext = createContext();
 
@@ -13,16 +15,11 @@ export const AuthProvider = ({ children }) => {
       if (firebaseUser) {
         try {
           // Try to get user data from Firestore
-          const userDoc = await db.collection('users').doc(firebaseUser.uid).get();
+          const userData = await userService.getUserById(firebaseUser.uid);
           
-          let userData;
-          if (userDoc.exists) {
-            userData = {
-              id: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: firebaseUser.displayName,
-              ...userDoc.data()
-            };
+          if (userData) {
+            setUser(userData);
+            await AsyncStorage.setItem('user', JSON.stringify(userData));
           } else {
             // If no user document exists, sign out the user
             await auth.signOut();
@@ -31,9 +28,6 @@ export const AuthProvider = ({ children }) => {
             setIsLoading(false);
             return;
           }
-          
-          setUser(userData);
-          await AsyncStorage.setItem('user', JSON.stringify(userData));
         } catch (error) {
           console.error('Error fetching user data:', error);
           // If there's an error fetching user data, sign out
@@ -58,9 +52,9 @@ export const AuthProvider = ({ children }) => {
       const firebaseUser = userCredential.user;
       
       // Get user data from Firestore to check their actual role
-      const userDoc = await db.collection('users').doc(firebaseUser.uid).get();
+      const userData = await userService.getUserById(firebaseUser.uid);
       
-      if (!userDoc.exists) {
+      if (!userData) {
         // No user document found - this shouldn't happen for registered users
         await auth.signOut();
         return { 
@@ -68,8 +62,6 @@ export const AuthProvider = ({ children }) => {
           error: 'User profile not found. Please contact support.' 
         };
       }
-      
-      const userData = userDoc.data();
       
       // Check if the selected role matches the user's actual role
       if (userData.role !== selectedRole) {
@@ -105,15 +97,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password, role = 'customer') => {
+  const register = async (name, email, password, role = 'customer', additionalData = {}) => {
     try {
       // Check if a user with this email and role combination already exists
-      const existingUsersQuery = await db.collection('users')
-        .where('email', '==', email.toLowerCase())
-        .get();
+      const existingUser = await userService.getUserByEmail(email);
       
-      if (!existingUsersQuery.empty) {
-        const existingUser = existingUsersQuery.docs[0].data();
+      if (existingUser) {
         return { 
           success: false, 
           error: `An account with this email already exists as a ${existingUser.role.charAt(0).toUpperCase() + existingUser.role.slice(1)}.` 
@@ -128,17 +117,22 @@ export const AuthProvider = ({ children }) => {
         displayName: name
       });
       
-      // Create user document in Firestore
+      // Create user document in Firestore with additional data
       const userData = {
         name: name.trim(),
         email: firebaseUser.email.toLowerCase(),
         role: role,
-        createdAt: new Date().toISOString(),
         isActive: true,
-        profileComplete: false
+        profileComplete: false,
+        rating: role === 'handyman' ? 0 : undefined,
+        reviewCount: role === 'handyman' ? 0 : undefined,
+        completedJobs: role === 'handyman' ? 0 : undefined,
+        // Generate profile picture if not provided
+        profilePicture: additionalData.profilePicture || getUserAvatarUri({ name, role }),
+        ...additionalData
       };
       
-      await db.collection('users').doc(firebaseUser.uid).set(userData);
+      await userService.createUser(firebaseUser.uid, userData);
       
       return { success: true };
     } catch (error) {
@@ -188,10 +182,7 @@ export const AuthProvider = ({ children }) => {
     try {
       if (!user) return { success: false, error: 'No user logged in' };
       
-      await db.collection('users').doc(user.id).update({
-        ...updates,
-        updatedAt: new Date().toISOString()
-      });
+      await userService.updateUserProfile(user.id, updates);
       
       // Update local user state
       const updatedUser = { ...user, ...updates };
