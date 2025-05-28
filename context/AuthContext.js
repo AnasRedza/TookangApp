@@ -97,59 +97,63 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password, role = 'customer', additionalData = {}) => {
-    try {
-      // Check if a user with this email and role combination already exists
-      const existingUser = await userService.getUserByEmail(email);
-      
-      if (existingUser) {
-        return { 
-          success: false, 
-          error: `An account with this email already exists as a ${existingUser.role.charAt(0).toUpperCase() + existingUser.role.slice(1)}.` 
-        };
-      }
-
-      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-      const firebaseUser = userCredential.user;
-      
-      // Update profile
-      await firebaseUser.updateProfile({
-        displayName: name
-      });
-      
-      // Create user document in Firestore with additional data
-      const userData = {
-        name: name.trim(),
-        email: firebaseUser.email.toLowerCase(),
-        role: role,
-        isActive: true,
-        profileComplete: false,
-        rating: role === 'handyman' ? 0 : undefined,
-        reviewCount: role === 'handyman' ? 0 : undefined,
-        completedJobs: role === 'handyman' ? 0 : undefined,
-        // Generate profile picture if not provided
-        profilePicture: additionalData.profilePicture || getUserAvatarUri({ name, role }),
-        ...additionalData
+const register = async (name, email, password, role = 'customer', additionalData = {}) => {
+  try {
+    // Check if a user with this email and role combination already exists
+    const existingUser = await userService.getUserByEmail(email);
+    
+    if (existingUser) {
+      return { 
+        success: false, 
+        error: `An account with this email already exists as a ${existingUser.role.charAt(0).toUpperCase() + existingUser.role.slice(1)}.` 
       };
-      
-      await userService.createUser(firebaseUser.uid, userData);
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Registration error:', error);
-      let errorMessage = 'Registration failed. Please try again.';
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'An account with this email already exists.';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address.';
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'Password is too weak. Please choose a stronger password (minimum 6 characters).';
-      } else if (error.code === 'auth/operation-not-allowed') {
-        errorMessage = 'Email/password accounts are not enabled. Please contact support.';
-      }
-      return { success: false, error: errorMessage };
     }
-  };
+
+    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+    const firebaseUser = userCredential.user;
+    
+    // Update profile
+    await firebaseUser.updateProfile({
+      displayName: name
+    });
+    
+    // Create base user data
+    const userData = {
+      name: name.trim(),
+      email: firebaseUser.email.toLowerCase(),
+      role: role,
+      isActive: true,
+      profileComplete: false,
+      // Generate profile picture if not provided
+      profilePicture: additionalData.profilePicture || getUserAvatarUri({ name, role }),
+      ...additionalData
+    };
+
+    // Only add handyman-specific fields if user is a handyman
+    if (role === 'handyman') {
+      userData.rating = 0;
+      userData.reviewCount = 0;
+      userData.completedJobs = 0;
+    }
+    
+    await userService.createUser(firebaseUser.uid, userData);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Registration error:', error);
+    let errorMessage = 'Registration failed. Please try again.';
+    if (error.code === 'auth/email-already-in-use') {
+      errorMessage = 'An account with this email already exists.';
+    } else if (error.code === 'auth/invalid-email') {
+      errorMessage = 'Invalid email address.';
+    } else if (error.code === 'auth/weak-password') {
+      errorMessage = 'Password is too weak. Please choose a stronger password (minimum 6 characters).';
+    } else if (error.code === 'auth/operation-not-allowed') {
+      errorMessage = 'Email/password accounts are not enabled. Please contact support.';
+    }
+    return { success: false, error: errorMessage };
+  }
+};
 
   const logout = async () => {
     try {

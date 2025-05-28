@@ -4,29 +4,35 @@ import firebase from 'firebase/compat/app';
 
 export const userService = {
   // Create a new user profile
-  createUser: async (userId, userData) => {
-    try {
-      const userDoc = {
-        ...userData,
-        isActive: true,
-        profileComplete: false,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      };
-      
-      await db.collection('users').doc(userId).set(userDoc);
-      
-      return {
-        id: userId,
-        ...userDoc,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-    } catch (error) {
-      console.error('Error creating user:', error);
-      throw error;
-    }
-  },
+  // Create a new user profile
+createUser: async (userId, userData) => {
+  try {
+    // Remove any undefined values to prevent Firestore errors
+    const cleanUserData = Object.fromEntries(
+      Object.entries(userData).filter(([_, value]) => value !== undefined)
+    );
+
+    const userDoc = {
+      ...cleanUserData,
+      isActive: true,
+      profileComplete: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+    
+    await db.collection('users').doc(userId).set(userDoc);
+    
+    return {
+      id: userId,
+      ...userDoc,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error('Error creating user:', error);
+    throw error;
+  }
+},
 
   // Get user by ID
   getUserById: async (userId) => {

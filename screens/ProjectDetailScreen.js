@@ -1,3 +1,4 @@
+// Enhanced ProjectDetailScreen.js - Better Handyman Actions
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -11,20 +12,14 @@ import {
   SafeAreaView,
   Modal,
   Dimensions,
-  Platform
+  Platform,
+  Animated
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { getUserAvatarUri } from '../utils/imageUtils';
 import Colors from '../constants/Colors';
 
 const { width } = Dimensions.get('window');
-
-// Guaranteed working image URLs for testing
-const TEST_IMAGES = {
-  BID_ATTACHMENTS: [
-    'https://reactnative.dev/docs/assets/p_cat2.png',
-    'https://reactnative.dev/img/header_logo.svg'
-  ]
-};
 
 const ProjectDetailScreen = ({ route, navigation }) => {
   const { 
@@ -41,6 +36,13 @@ const ProjectDetailScreen = ({ route, navigation }) => {
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState('');
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [modalType, setModalType] = useState('');
+  
+  // Animation values
+  const fadeAnim = useState(new Animated.Value(0))[0];
+  const slideAnim = useState(new Animated.Value(50))[0];
   
   // Status colors for different project states
   const STATUS_COLORS = {
@@ -62,6 +64,7 @@ const ProjectDetailScreen = ({ route, navigation }) => {
   useEffect(() => {
     if (passedProject) {
       normalizeProjectData(passedProject);
+      animateIn();
     } else if (projectId) {
       fetchProjectData(projectId);
     }
@@ -73,6 +76,21 @@ const ProjectDetailScreen = ({ route, navigation }) => {
       setProjectStatus(status);
     }
   }, [status]);
+
+  const animateIn = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
   
   // Normalize project data from different sources
   const normalizeProjectData = (rawProject) => {
@@ -85,9 +103,9 @@ const ProjectDetailScreen = ({ route, navigation }) => {
         initialBudget: extractBudgetAmount(rawProject.budget),
         customer: {
           name: rawProject.customerName,
-          avatar: `https://randomuser.me/api/portraits/${rawProject.customerName.includes('Sarah') ? 'women' : 'men'}/30.jpg`, 
+          avatar: getUserAvatarUri({ name: rawProject.customerName, profilePicture: rawProject.customerAvatar }),
           rating: rawProject.customerRating || 4.5,
-          id: `c${rawProject.id}`
+          id: rawProject.customerId || `c${rawProject.id}`
         },
         preferredDate: rawProject.preferredDate || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
         preferredTime: rawProject.preferredTime || 'morning',
@@ -95,15 +113,26 @@ const ProjectDetailScreen = ({ route, navigation }) => {
       };
     }
     
-    if (rawProject.handyman && !rawProject.handyman.avatar) {
+    // Use the actual handyman data passed from route params if available
+    if (rawProject.handyman) {
       normalizedProject.handyman = {
         ...rawProject.handyman,
-        avatar: `https://randomuser.me/api/portraits/men/${parseInt(rawProject.id) + 20}.jpg`
+        avatar: getUserAvatarUri(rawProject.handyman)
+      };
+    } else if (route.params?.handyman) {
+      // Use the handyman from route params (when navigating from handyman selection)
+      normalizedProject.handyman = {
+        ...route.params.handyman,
+        avatar: getUserAvatarUri(route.params.handyman)
       };
     }
     
-    // Ensure bidAttachments is always an array
-    if (!rawProject.bidAttachments || !Array.isArray(rawProject.bidAttachments)) {
+    // Use actual bidAttachments/images from Firebase
+    if (rawProject.bidAttachments && Array.isArray(rawProject.bidAttachments)) {
+      normalizedProject.bidAttachments = rawProject.bidAttachments;
+    } else if (rawProject.images && Array.isArray(rawProject.images)) {
+      normalizedProject.bidAttachments = rawProject.images;
+    } else {
       normalizedProject.bidAttachments = [];
     }
     
@@ -130,47 +159,52 @@ const ProjectDetailScreen = ({ route, navigation }) => {
         category: 'Plumbing',
         distance: '3.5 km',
         status: 'open',
-        preferredDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
-        preferredTime: 'morning',
+        preferredDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+        preferredTime: new Date(new Date().setHours(14, 0, 0, 0)),
         materials: 'May need new P-trap or seals.',
         notes: 'Water shutoff valve is located under the sink.',
-        bidAttachments: TEST_IMAGES.BID_ATTACHMENTS
+        // Use actual Firebase data - these would come from the project document
+        bidAttachments: [], // This should be populated from Firebase
+        // Add proper handyman data if this is for customer view
+        handyman: route.params?.handyman || null
       };
       normalizeProjectData(mockProject);
       setLoading(false);
+      animateIn();
     }, 1000);
   };
   
   // Helper functions
-  const extractBudgetAmount = (budgetString) => {
-    if (!budgetString) return 100;
-    const match = budgetString.match(/RM(\d+)/);
-    return match && match[1] ? parseInt(match[1]) : 100;
-  };
+const extractBudgetAmount = (budgetString) => {
+  if (!budgetString || typeof budgetString !== 'string') return 100;
+  const match = budgetString.match(/RM(\d+)/);
+  return match && match[1] ? parseInt(match[1]) : 100;
+};
   
   const getOtherParty = () => {
     if (!project) return null;
     
     const defaultCustomer = { 
       name: project.customerName || 'Customer', 
-      avatar: `https://randomuser.me/api/portraits/${project.customerName?.includes('Sarah') ? 'women' : 'men'}/30.jpg`, 
-      id: 'unknown', 
+      avatar: getUserAvatarUri({ name: project.customerName, profilePicture: project.customerAvatar }),
+      id: project.customerId || 'unknown', 
       rating: project.customerRating || 4.5 
     };
     
-    const defaultHandyman = { 
-      name: 'Handyman', 
-      avatar: `https://randomuser.me/api/portraits/men/20.jpg`, 
-      id: 'unknown', 
-      rating: 4.5 
-    };
-    
-    const otherParty = isHandyman 
-      ? (project.customer || defaultCustomer) 
-      : (project.handyman || defaultHandyman);
+const defaultHandyman = { 
+  name: project.requestedHandymanName || 'No specific handyman requested', 
+  avatar: getUserAvatarUri({ name: project.requestedHandymanName, profilePicture: project.requestedHandymanAvatar }),
+  id: project.requestedHandymanId || 'unknown', 
+  rating: 4.5 
+};
+
+const otherParty = isHandyman 
+  ? (project.customer || defaultCustomer) 
+  : (project.requestedHandyman || defaultHandyman);
       
-    if (!otherParty.avatar) {
-      otherParty.avatar = isHandyman ? defaultCustomer.avatar : defaultHandyman.avatar;
+    // Ensure avatar is properly set using getUserAvatarUri
+    if (!otherParty.avatar || otherParty.avatar.includes('randomuser.me')) {
+      otherParty.avatar = getUserAvatarUri(otherParty);
     }
     
     return otherParty;
@@ -253,76 +287,114 @@ const ProjectDetailScreen = ({ route, navigation }) => {
       setShowImageGallery(true);
     }
   };
-  
-  // Action handlers
-  const handleAcceptProject = () => {
-    Alert.alert(
-      "Accept Project",
-      "Are you sure you want to accept this project with the customer's budget?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Accept", 
-          onPress: () => {
-            setIsLoading(true);
-            setTimeout(() => {
-              setProjectStatus('accepted');
-              setProject(prev => ({...prev, status: 'accepted'}));
-              setIsLoading(false);
-              Alert.alert("Project Accepted", "You have accepted this project.");
-            }, 1000);
-          }
-        }
-      ]
-    );
+
+  // Enhanced action handlers for handymen
+  const showActionConfirmation = (type) => {
+    setModalType(type);
+    setShowActionModal(true);
   };
-  
-  // Fixed negotiate button handler to prevent navigation error
-  const handleNegotiateProject = () => {
-    // Check if ProjectOffer screen is available in your navigation
+
+  const executeAction = async (action) => {
+    setShowActionModal(false);
+    setActionLoading(action);
+    
     try {
-      // Option 1: Set negotiation state directly instead of navigating
-      setIsLoading(true);
-      setTimeout(() => {
-        setProjectStatus('negotiating');
-        setProject(prev => ({...prev, status: 'negotiating'}));
-        setIsLoading(false);
-        Alert.alert("Negotiation Started", "You've started negotiating this project.");
-      }, 1000);
-      
-      // Option 2 (commented out): Safely check if screen exists before navigating
-      // if (navigation && navigation.navigate) {
-      //   navigation.navigate('ProjectOffer', { 
-      //     projectId: project.id, 
-      //     project, 
-      //     mode: 'negotiate', 
-      //     viewMode: 'handyman'
-      //   });
-      // } else {
-      //   Alert.alert("Navigation Error", "Cannot navigate to offer screen.");
-      // }
+      switch (action) {
+        case 'accept':
+          await handleAcceptProject();
+          break;
+        case 'negotiate':
+          await handleNegotiateProject();
+          break;
+        case 'decline':
+          await handleDeclineProject();
+          break;
+      }
     } catch (error) {
-      console.log("Navigation error:", error);
-      Alert.alert("Navigation Error", "Could not open negotiation screen.");
+      console.error('Action error:', error);
+      Alert.alert('Error', 'Failed to complete action. Please try again.');
+    } finally {
+      setActionLoading('');
     }
   };
+
+  // Action handlers
+  const handleAcceptProject = async () => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        setProjectStatus('accepted');
+        setProject(prev => ({...prev, status: 'accepted'}));
+        
+        Alert.alert(
+          "🎉 Project Accepted!",
+          "Great! You've successfully accepted this project. The customer has been notified and you can now start coordinating the work.",
+          [
+            {
+              text: "View My Projects",
+              onPress: () => {
+                navigation.navigate('ProjectsTab', {
+                  screen: 'MyProjects'
+                });
+              }
+            },
+            { text: "Stay Here", style: "cancel" }
+          ]
+        );
+        resolve();
+      }, 1500);
+    });
+  };
   
-  const handleDeclineProject = () => {
-    Alert.alert(
-      "Decline Project",
-      "Are you sure you want to decline this project?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Decline", style: "destructive", onPress: () => navigation.goBack() }
-      ]
-    );
+  const handleNegotiateProject = async () => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        try {
+          navigation.navigate('ProjectOffer', { 
+            projectId: project.id, 
+            project, 
+            mode: 'negotiate', 
+            viewMode: 'handyman'
+          });
+        } catch (error) {
+          Alert.alert(
+            "Start Discussion",
+            "You can now discuss project details with the customer. Would you like to send them a message?",
+            [
+              {
+                text: "Send Message",
+                onPress: () => handleContactUser()
+              },
+              { text: "Later", style: "cancel" }
+            ]
+          );
+        }
+        resolve();
+      }, 1000);
+    });
+  };
+
+  const handleDeclineProject = async () => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        Alert.alert(
+          "Project Declined",
+          "You've declined this project. It has been removed from your available jobs list.",
+          [
+            { 
+              text: "Find More Jobs", 
+              onPress: () => navigation.goBack() 
+            }
+          ]
+        );
+        resolve();
+      }, 1000);
+    });
   };
   
   const handleContactUser = () => {
     const otherParty = getOtherParty();
     if (!otherParty) return;
     
-    // Check if Chat screen exists in navigation
     try {
       navigation.navigate('Chat', {
         recipient: {
@@ -340,115 +412,39 @@ const ProjectDetailScreen = ({ route, navigation }) => {
       Alert.alert("Chat Error", `Couldn't open chat with ${otherParty.name}.`);
     }
   };
-  
-  const handlePayForProject = () => {
-    // Check if Payment screen exists in navigation
-    try {
-      navigation.navigate('Payment', {
-        project: project,
-        total: parseFloat(project.adjustedBudget || project.agreedBudget || 
-          project.initialBudget || extractBudgetAmount(project.budget))
-      });
-    } catch (error) {
-      console.log("Payment navigation error:", error);
-      Alert.alert("Payment Error", "Payment screen is not available.");
-    }
-  };
 
-  const handleViewAdjustment = () => {
-    // Check if AdjustmentApproval screen exists in navigation
-    try {
-      navigation.navigate('AdjustmentApproval', { 
-        project: project, 
-        adjustment: { 
-          newAmount: project.adjustedBudget || extractBudgetAmount(project.budget),
-          reason: project.adjustmentReason || 'Additional work required'
-        }
-      });
-    } catch (error) {
-      console.log("Adjustment navigation error:", error);
-      Alert.alert("Adjustment Error", "Adjustment screen is not available.");
-    }
-  };
-
-  const handleCompleteJob = () => {
-    Alert.alert(
-      "Complete Job",
-      "Have you completed all the required work for this job?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Complete", 
-          onPress: () => {
-            setIsLoading(true);
-            setTimeout(() => {
-              setIsLoading(false);
-              setProject(prev => ({
-                ...prev,
-                status: 'completed',
-                completedAt: new Date().toISOString()
-              }));
-              setProjectStatus('completed');
-              Alert.alert("Job Completed", "You have marked this job as completed.");
-            }, 1000);
-          } 
-        }
-      ]
-    );
-  };
-
-  const handleRequestBudgetAdjustment = () => {
-    // Check if BudgetAdjustment screen exists in navigation
-    try {
-      navigation.navigate('BudgetAdjustment', { project: project });
-    } catch (error) {
-      console.log("Budget adjustment navigation error:", error);
-      Alert.alert("Budget Adjustment", "Budget adjustment screen is not available.");
-    }
-  };
-
-  const handleReviewUser = () => {
-    const otherParty = getOtherParty();
-    if (!otherParty) return;
+  // Modal content for different actions
+  const getModalContent = () => {
+    const budget = formatBudget(project?.budget || project?.adjustedBudget || project?.agreedBudget || project?.initialBudget);
     
-    // Check if ReviewScreen exists in navigation
-    try {
-      navigation.navigate('ReviewScreen', { 
-        project: project,
-        userToReview: otherParty.name,
-        userType: isHandyman ? 'customer' : 'handyman',
-        onReviewSubmitted: (reviewData) => {
-          setProject(prev => ({...prev, isReviewed: true, reviewData}));
-        }
-      });
-    } catch (error) {
-      console.log("Review navigation error:", error);
-      Alert.alert("Review Error", "Review screen is not available.");
+    switch (modalType) {
+      case 'accept':
+        return {
+          title: '✅ Accept This Project?',
+          message: `You're about to accept "${project?.title}" for ${budget}.\n\nThis means you commit to completing the work as described. The customer will be notified immediately.`,
+          confirmText: 'Yes, Accept',
+          confirmColor: Colors.success,
+          onConfirm: () => executeAction('accept')
+        };
+      case 'negotiate':
+        return {
+          title: '💬 Start Negotiation?',
+          message: `You'll be able to discuss project details, timeline, and potentially adjust the budget with the customer.\n\nThis opens up a conversation channel.`,
+          confirmText: 'Start Discussion',
+          confirmColor: Colors.primary,
+          onConfirm: () => executeAction('negotiate')
+        };
+      case 'decline':
+        return {
+          title: '❌ Decline This Project?',
+          message: `You're about to decline "${project?.title}".\n\nThis project will be removed from your available jobs and you won't see it again.`,
+          confirmText: 'Yes, Decline',
+          confirmColor: '#E53935',
+          onConfirm: () => executeAction('decline')
+        };
+      default:
+        return null;
     }
-  };
-
-  const handleCancel = () => {
-    Alert.alert(
-      isHandyman ? "Cancel Job" : "Cancel Project",
-      `Are you sure you want to cancel this ${isHandyman ? 'job' : 'project'}?`,
-      [
-        { text: "No", style: "cancel" },
-        { 
-          text: "Yes", 
-          style: "destructive",
-          onPress: () => {
-            setIsLoading(true);
-            setTimeout(() => {
-              setIsLoading(false);
-              setProject(prev => ({...prev, status: 'cancelled'}));
-              setProjectStatus('cancelled');
-              Alert.alert("Project Cancelled", "You have cancelled this project.", 
-                [{ text: "OK", onPress: () => navigation.goBack() }]);
-            }, 1000);
-          } 
-        }
-      ]
-    );
   };
 
   // Show loading indicator
@@ -481,20 +477,29 @@ const ProjectDetailScreen = ({ route, navigation }) => {
   
   // Get the other party (customer or handyman)
   const otherParty = getOtherParty();
+  const modalContent = getModalContent();
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>Back</Text>
+          <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{project.title}</Text>
         <View style={styles.headerPlaceholder} />
       </View>
       
-      {/* Main content */}
-      <View style={styles.mainContainer}>
+      {/* Main content with animation */}
+      <Animated.View 
+        style={[
+          styles.mainContainer,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           {/* Status Banner */}
           {projectStatus !== 'viewing' && projectStatus !== 'open' && (
@@ -529,7 +534,7 @@ const ProjectDetailScreen = ({ route, navigation }) => {
             <Text style={styles.descriptionText}>{project.description}</Text>
           </View>
           
-          {/* Customer Bid Attachments Section */}
+          {/* Customer Attachments Section */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Customer Attachments</Text>
             
@@ -570,12 +575,12 @@ const ProjectDetailScreen = ({ route, navigation }) => {
             </View>
             
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Date</Text>
+              <Text style={styles.detailLabel}>Preferred Date</Text>
               <Text style={styles.detailValue}>{formatDate(project.preferredDate)}</Text>
             </View>
             
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Time</Text>
+              <Text style={styles.detailLabel}>Preferred Time</Text>
               <Text style={styles.detailValue}>{formatTime(project.preferredTime)}</Text>
             </View>
             
@@ -612,175 +617,121 @@ const ProjectDetailScreen = ({ route, navigation }) => {
             </View>
           )}
           
-          {/* Customer/Handyman Info */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>{isHandyman ? 'Customer' : 'Handyman'}</Text>
-            <View style={styles.userInfo}>
-              <Image 
-                source={{ uri: otherParty.avatar }} 
-                style={styles.userAvatar}
-              />
-              <View style={styles.userDetails}>
-                <Text style={styles.userName}>{otherParty.name}</Text>
-                <View style={styles.ratingContainer}>
-                  <Text style={styles.ratingValue}>{(otherParty.rating || 4.5).toFixed(1)} ★</Text>
-                </View>
+        {/* Customer/Requested Handyman Info */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{isHandyman ? 'Customer' : 'Requested Handyman'}</Text>
+          <View style={styles.userInfo}>
+            <Image 
+              source={{ uri: isHandyman ? 
+                getUserAvatarUri(project.customer || { name: project.customerName }) :
+                getUserAvatarUri({ name: project.requestedHandymanName, profilePicture: project.requestedHandymanAvatar })
+              }} 
+              style={styles.userAvatar}
+            />
+            <View style={styles.userDetails}>
+              <Text style={styles.userName}>
+                {isHandyman ? (project.customer?.name || project.customerName) : (project.requestedHandymanName || 'No specific handyman requested')}
+              </Text>
+              <View style={styles.ratingContainer}>
+                <Text style={styles.ratingValue}>
+                  {isHandyman ? (project.customer?.rating || project.customerRating || 4.5).toFixed(1) : '★'} ★
+                </Text>
               </View>
             </View>
           </View>
+        </View>
           
-          {/* Bottom padding to ensure content isn't covered by action buttons */}
+          {/* Bottom padding */}
           <View style={styles.bottomPadding} />
         </ScrollView>
         
-        {/* Action Buttons */}
-        <View style={styles.actionContainer}>
-          {isHandyman ? (
-            // HANDYMAN ACTIONS
-            <>
-              {/* Available Jobs */}
-              {(viewMode === 'handyman' || project.status === 'open') && projectStatus === 'viewing' && (
-                <View style={styles.buttonRow}>
+        {/* Enhanced Action Buttons for Handymen */}
+        {isHandyman && (viewMode === 'handyman' || project.status === 'open') && projectStatus === 'viewing' && (
+          <View style={styles.actionContainer}>
+            <View style={styles.actionButtonsContainer}>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.declineButton]}
+                onPress={() => showActionConfirmation('decline')}
+                disabled={actionLoading !== ''}
+              >
+                {actionLoading === 'decline' ? (
+                  <ActivityIndicator size="small" color="#E53935" />
+                ) : (
+                  <>
+                    <Text style={styles.declineButtonText}>Pass</Text>
+                    <Text style={styles.actionSubtext}>Not interested</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.negotiateButton]}
+                onPress={() => showActionConfirmation('negotiate')}
+                disabled={actionLoading !== ''}
+              >
+                {actionLoading === 'negotiate' ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : (
+                  <>
+                    <Text style={styles.negotiateButtonText}>Discuss</Text>
+                    <Text style={styles.actionSubtext}>Talk details</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.acceptButton]}
+                onPress={() => showActionConfirmation('accept')}
+                disabled={actionLoading !== ''}
+              >
+                {actionLoading === 'accept' ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Text style={styles.acceptButtonText}>Accept</Text>
+                    <Text style={styles.actionSubtext}>Take the job</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </Animated.View>
+      
+      {/* Action Confirmation Modal */}
+      <Modal
+        visible={showActionModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowActionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {modalContent && (
+              <>
+                <Text style={styles.modalTitle}>{modalContent.title}</Text>
+                <Text style={styles.modalMessage}>{modalContent.message}</Text>
+                
+                <View style={styles.modalButtons}>
                   <TouchableOpacity 
-                    style={[styles.actionButton, styles.declineButton]}
-                    onPress={handleDeclineProject}
+                    style={styles.modalCancelButton}
+                    onPress={() => setShowActionModal(false)}
                   >
-                    <Text style={styles.declineButtonText}>Decline</Text>
+                    <Text style={styles.modalCancelText}>Cancel</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity 
-                    style={[styles.actionButton, styles.negotiateButton]}
-                    onPress={handleNegotiateProject}
-                    disabled={isLoading}
+                    style={[styles.modalConfirmButton, { backgroundColor: modalContent.confirmColor }]}
+                    onPress={modalContent.onConfirm}
                   >
-                    {isLoading ? (
-                      <ActivityIndicator size="small" color="#F57C00" />
-                    ) : (
-                      <Text style={styles.negotiateButtonText}>Negotiate</Text>
-                    )}
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={[styles.actionButton, styles.acceptButton]}
-                    onPress={handleAcceptProject}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.acceptButtonText}>Accept</Text>
-                    )}
+                    <Text style={styles.modalConfirmText}>{modalContent.confirmText}</Text>
                   </TouchableOpacity>
                 </View>
-              )}
-              
-              {/* Ongoing Jobs */}
-              {(viewMode === 'normal' || ['in_progress', 'agreed_scheduled'].includes(project.status)) && 
-                projectStatus !== 'viewing' && (
-                  <View style={styles.buttonRow}>
-                    {project.status === 'in_progress' && (
-                      <TouchableOpacity 
-                        style={styles.primaryButton}
-                        onPress={handleCompleteJob}
-                        disabled={isLoading}
-                      >
-                        {isLoading ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <Text style={styles.primaryButtonText}>Mark Complete</Text>
-                        )}
-                      </TouchableOpacity>
-                    )}
-                    
-                    {(project.status === 'agreed_scheduled' || project.status === 'in_progress') && (
-                      <TouchableOpacity 
-                        style={styles.secondaryButton}
-                        onPress={handleRequestBudgetAdjustment}
-                      >
-                        <Text style={styles.secondaryButtonText}>Request Adjustment</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )
-              }
-              
-              {/* Completed Jobs */}
-              {project.status === 'completed' && !project.isReviewed && (
-                <TouchableOpacity 
-                  style={styles.primaryButton}
-                  onPress={handleReviewUser}
-                >
-                  <Text style={styles.primaryButtonText}>Review Customer</Text>
-                </TouchableOpacity>
-              )}
-              
-              {/* Message button */}
-              {(projectStatus === 'accepted' || project.status === 'accepted' || 
-               project.status === 'in_progress' || project.status === 'agreed_scheduled') && (
-                <TouchableOpacity 
-                  style={styles.messageButton}
-                  onPress={handleContactUser}
-                >
-                  <Text style={styles.messageButtonText}>Message Customer</Text>
-                </TouchableOpacity>
-              )}
-            </>
-          ) : (
-            // CUSTOMER ACTIONS
-            <>
-              {/* Payment actions */}
-              {(project.status === 'requires_payment' || project.status === 'agreed_scheduled') && (
-                <TouchableOpacity 
-                  style={styles.primaryButton}
-                  onPress={handlePayForProject}
-                >
-                  <Text style={styles.primaryButtonText}>Pay Now</Text>
-                </TouchableOpacity>
-              )}
-              
-              {/* Budget adjustment actions */}
-              {project.status === 'requires_adjustment' && (
-                <TouchableOpacity 
-                  style={styles.primaryButton}
-                  onPress={handleViewAdjustment}
-                >
-                  <Text style={styles.primaryButtonText}>View Adjustment</Text>
-                </TouchableOpacity>
-              )}
-              
-              {/* Review actions */}
-              {project.status === 'completed' && !project.isReviewed && (
-                <TouchableOpacity 
-                  style={styles.primaryButton}
-                  onPress={handleReviewUser}
-                >
-                  <Text style={styles.primaryButtonText}>Review Handyman</Text>
-                </TouchableOpacity>
-              )}
-              
-              {/* Cancel actions */}
-              {['pending_handyman_review', 'in_negotiation', 'open'].includes(project.status) && (
-                <TouchableOpacity 
-                  style={styles.cancelButton}
-                  onPress={handleCancel}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel Project</Text>
-                </TouchableOpacity>
-              )}
-              
-              {/* Message button */}
-              {(project.status === 'in_progress' || project.status === 'agreed_scheduled') && (
-                <TouchableOpacity 
-                  style={styles.messageButton}
-                  onPress={handleContactUser}
-                >
-                  <Text style={styles.messageButtonText}>Message Handyman</Text>
-                </TouchableOpacity>
-              )}
-            </>
-          )}
+              </>
+            )}
+          </View>
         </View>
-      </View>
+      </Modal>
       
       {/* Image Gallery Modal */}
       <Modal
@@ -794,7 +745,7 @@ const ProjectDetailScreen = ({ route, navigation }) => {
             style={styles.closeGalleryButton}
             onPress={() => setShowImageGallery(false)}
           >
-            <Text style={styles.closeButtonText}>Close</Text>
+            <Text style={styles.closeButtonText}>✕ Close</Text>
           </TouchableOpacity>
           
           {allImages.length > 0 && (
@@ -804,44 +755,8 @@ const ProjectDetailScreen = ({ route, navigation }) => {
                 style={styles.galleryImage}
                 resizeMode="contain"
               />
-              
-              <View style={styles.galleryInfo}>
-                <Text style={styles.galleryInfoText}>Customer Attachment</Text>
-              </View>
             </View>
           )}
-          
-          <View style={styles.galleryControls}>
-            <Text style={styles.galleryCounter}>
-              {selectedImageIndex + 1} / {imagesLength}
-            </Text>
-            <View style={styles.galleryNavButtons}>
-              <TouchableOpacity 
-                style={[styles.galleryNavButton, selectedImageIndex === 0 && {opacity: 0.5}]}
-                onPress={() => {
-                  if (selectedImageIndex > 0) {
-                    setSelectedImageIndex(selectedImageIndex - 1);
-                  }
-                }}
-                disabled={selectedImageIndex === 0}
-              >
-                <Text style={styles.navButtonText}>Prev</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.galleryNavButton, 
-                  selectedImageIndex === imagesLength - 1 && {opacity: 0.5}]}
-                onPress={() => {
-                  if (selectedImageIndex < imagesLength - 1) {
-                    setSelectedImageIndex(selectedImageIndex + 1);
-                  }
-                }}
-                disabled={selectedImageIndex === imagesLength - 1}
-              >
-                <Text style={styles.navButtonText}>Next</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -868,6 +783,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '600',
   },
   headerTitle: {
     fontSize: 18,
@@ -877,7 +793,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   headerPlaceholder: {
-    width: 60,
+    width: 80,
   },
   mainContainer: {
     flex: 1,
@@ -927,14 +843,14 @@ const styles = StyleSheet.create({
   // Card styling
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    borderRadius: 12,
     margin: 12,
     padding: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardTitle: {
     fontSize: 17,
@@ -950,9 +866,9 @@ const styles = StyleSheet.create({
   },
   categoryBadge: {
     backgroundColor: '#E8F4FD',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     marginBottom: 6,
   },
   categoryText: {
@@ -973,7 +889,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   budgetValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: '#4CAF50',
   },
@@ -987,7 +903,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0E0E0',
     marginVertical: 12,
   },
-  // Description
   descriptionText: {
     fontSize: 16,
     lineHeight: 24,
@@ -1010,7 +925,6 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 8,
   },
-  // No image message
   noImageContainer: {
     height: 100,
     justifyContent: 'center',
@@ -1028,16 +942,25 @@ const styles = StyleSheet.create({
   },
   // Details
   detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   detailLabel: {
     fontSize: 14,
     color: '#666666',
-    marginBottom: 4,
+    fontWeight: '500',
   },
   detailValue: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#333333',
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
   },
   // Materials & Notes
   notesSection: {
@@ -1073,9 +996,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   userAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     marginRight: 16,
     backgroundColor: '#F0F0F0',
   },
@@ -1097,118 +1020,152 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFC107',
   },
-  bottomPadding: {
-    height: 100,
+  reviewCount: {
+    fontSize: 12,
+    color: '#666666',
+    marginLeft: 8,
   },
-  // Action buttons
+  bottomPadding: {
+    height: 120,
+  },
+  // Enhanced Action buttons
   actionContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     backgroundColor: '#FFFFFF',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
     borderTopWidth: 1,
     borderTopColor: '#EEEEEE',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
+    shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  buttonRow: {
+  actionButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 8,
   },
   actionButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     flex: 1,
-    marginHorizontal: 4,
+    minHeight: 60,
   },
   acceptButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: Colors.success,
+    shadowColor: Colors.success,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   negotiateButton: {
-    backgroundColor: '#FFF8E1',
-    borderWidth: 1,
-    borderColor: '#FFC107',
+    backgroundColor: Colors.highlight,
+    borderWidth: 2,
+    borderColor: Colors.primary,
   },
   declineButton: {
-    backgroundColor: '#FFEBEE',
-    borderWidth: 1,
+    backgroundColor: '#FFF5F5',
+    borderWidth: 2,
     borderColor: '#FFCDD2',
   },
   acceptButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#FFFFFF',
+    marginBottom: 2,
   },
   negotiateButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#F57C00',
+    fontWeight: 'bold',
+    color: Colors.primary,
+    marginBottom: 2,
   },
   declineButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#D32F2F',
+    fontWeight: 'bold',
+    color: '#E53935',
+    marginBottom: 2,
   },
-  primaryButton: {
+  actionSubtext: {
+    fontSize: 11,
+    opacity: 0.8,
+    textAlign: 'center',
+  },
+  // Modal styles
+  modalOverlay: {
     flex: 1,
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
-    paddingVertical: 14,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    padding: 20,
   },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: '#FF9800',
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  secondaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  cancelButton: {
+  modalContent: {
     backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#666666',
+    lineHeight: 22,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#F44336',
-    paddingVertical: 14,
+    borderColor: '#DDDDDD',
     alignItems: 'center',
   },
-  cancelButtonText: {
-    color: '#F44336',
+  modalCancelText: {
     fontSize: 16,
+    color: '#666666',
     fontWeight: '600',
   },
-  messageButton: {
-    backgroundColor: '#2196F3',
+  modalConfirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
-    paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 12,
   },
-  messageButtonText: {
-    color: '#FFFFFF',
+  modalConfirmText: {
     fontSize: 16,
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
-  // Gallery
+  // Gallery styles
   galleryModal: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.9)',
@@ -1224,63 +1181,21 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  galleryInfo: {
-    position: 'absolute',
-    bottom: 10,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 8,
-    alignItems: 'center',
-  },
-  galleryInfoText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
-  },
   closeGalleryButton: {
     position: 'absolute',
-    top: 40,
+    top: 50,
     right: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
+    zIndex: 1,
   },
   closeButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  galleryControls: {
-    position: 'absolute',
-    bottom: 40,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  galleryCounter: {
-    color: '#FFFFFF',
     fontSize: 16,
-  },
-  galleryNavButtons: {
-    flexDirection: 'row',
-  },
-  galleryNavButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    marginLeft: 10,
-  },
-  navButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
     fontWeight: 'bold',
-  }
+  },
 });
 
 export default ProjectDetailScreen;

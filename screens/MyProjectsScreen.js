@@ -17,6 +17,9 @@ import { useAuth } from '../context/AuthContext';
 import { projectService } from '../services/projectService';
 import { userService } from '../services/userService';
 import Colors from '../constants/Colors';
+import firebase from '../firebase';
+import { getUserAvatarUri } from '../utils/imageUtils';
+
 
 const MyProjectsScreen = ({ route, navigation }) => {
   const { user, isHandyman } = useAuth();
@@ -130,11 +133,11 @@ const MyProjectsScreen = ({ route, navigation }) => {
       // Customer view
       if (activeTab === 'active') {
         return projects.filter(project => 
-          !['completed', 'cancelled', 'disputed'].includes(project.status)
+          !['completed', 'cancelled', 'disputed', 'declined'].includes(project.status)
         );
       } else {
         return projects.filter(project => 
-          ['completed', 'cancelled', 'disputed'].includes(project.status)
+          ['completed', 'cancelled', 'disputed', 'declined'].includes(project.status)
         );
       }
     }
@@ -265,6 +268,7 @@ const MyProjectsScreen = ({ route, navigation }) => {
         case 'completed': return 'Completed';
         case 'cancelled': return 'Cancelled';
         case 'disputed': return 'Disputed';
+        case 'declined': return isHandyman ? 'Declined Job' : 'Declined by Handyman';
         default: return status;
       }
     } else {
@@ -280,6 +284,7 @@ const MyProjectsScreen = ({ route, navigation }) => {
         case 'completed': return 'Completed';
         case 'cancelled': return 'Cancelled';
         case 'disputed': return 'Disputed';
+        case 'declined': return isHandyman ? 'Declined Job' : 'Declined by Handyman';
         default: return status;
       }
     }
@@ -305,7 +310,11 @@ const MyProjectsScreen = ({ route, navigation }) => {
   
   // Render project item
   const renderProjectItem = ({ item }) => {
-    const otherParty = isHandyman ? item.customer : item.handyman;
+    const otherParty = isHandyman ? item.customer : (item.handyman || {
+  name: item.requestedHandymanName || 'No handyman assigned',
+  avatar: getUserAvatarUri({ name: item.requestedHandymanName, profilePicture: item.requestedHandymanAvatar }),
+  rating: 4.5
+});
     
     return (
       <TouchableOpacity 
@@ -346,7 +355,7 @@ const MyProjectsScreen = ({ route, navigation }) => {
         <View style={styles.budgetContainer}>
           <Text style={styles.budgetLabel}>{isHandyman ? 'Earnings:' : 'Budget:'}</Text>
           <Text style={styles.budgetAmount}>
-            RM {parseFloat(item.adjustedBudget || item.agreedBudget || item.initialBudget || 0).toFixed(2)}
+            RM {parseFloat(item.adjustedBudget || item.agreedBudget || item.initialBudget || item.budget || extractBudgetAmount(item.budget) || 0).toFixed(2)}
           </Text>
         </View>
         
@@ -358,7 +367,7 @@ const MyProjectsScreen = ({ route, navigation }) => {
             {otherParty ? (
               <>
                 <Image 
-                  source={{ uri: otherParty.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherParty.name)}&background=random` }} 
+                  source={{ uri: getUserAvatarUri(otherParty) }} 
                   style={styles.avatarImage} 
                 />
                 <View style={styles.partyDetails}>
@@ -486,7 +495,7 @@ const MyProjectsScreen = ({ route, navigation }) => {
         <FlatList
           data={getFilteredProjects()}
           renderItem={renderProjectItem}
-          keyExtractor={item => item.id}
+          keyExtractor={(item, index) => `${item.id}_${index}`}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           refreshControl={

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,144 +6,162 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  SafeAreaView
+  SafeAreaView,
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { chatService } from '../services/chatService';
+import { getUserAvatarUri } from '../utils/imageUtils';
 import Colors from '../constants/Colors';
 
-// Mock data for conversation list - CUSTOMER VIEW
-const CUSTOMER_CONVERSATIONS = [
-  {
-    id: '1',
-    name: 'John the Plumber',
-    avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
-    lastMessage: 'I will bring the necessary tools tomorrow at 10am.',
-    timestamp: new Date(Date.now() - 61200000).toISOString(),
-    unread: 0,
-    project: 'Bathroom Sink Repair',
-  },
-  {
-    id: '2',
-    name: 'Sarah Williams',
-    avatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-    lastMessage: "I've finished painting the living room. Let me know what you think!",
-    timestamp: new Date(Date.now() - 3600000).toISOString(),
-    unread: 2,
-    project: 'Living Room Renovation',
-  },
-  {
-    id: '3',
-    name: 'Michael Chen',
-    avatar: 'https://randomuser.me/api/portraits/men/3.jpg',
-    lastMessage: 'The ceiling fan installation is complete.',
-    timestamp: new Date(Date.now() - 86400000).toISOString(),
-    unread: 0,
-    project: 'Ceiling Fan Installation',
-  },
-];
 
-// Mock data for conversation list - HANDYMAN VIEW
-const HANDYMAN_CONVERSATIONS = [
-  {
-    id: '1',
-    name: 'Sarah Johnson',
-    avatar: 'https://randomuser.me/api/portraits/women/6.jpg',
-    lastMessage: 'What time can you arrive tomorrow to fix my bathroom sink?',
-    timestamp: new Date(Date.now() - 61200000).toISOString(),
-    unread: 0,
-    project: 'Bathroom Sink Repair',
-    isNewRequest: false,
-  },
-  {
-    id: '2',
-    name: 'James Wilson',
-    avatar: 'https://randomuser.me/api/portraits/men/7.jpg',
-    lastMessage: 'When can you start the kitchen renovation?',
-    timestamp: new Date(Date.now() - 3600000).toISOString(),
-    unread: 3,
-    project: 'Kitchen Renovation',
-    isNewRequest: true,
-  },
-  {
-    id: '3',
-    name: 'Emily Rodriguez',
-    avatar: 'https://randomuser.me/api/portraits/women/8.jpg',
-    lastMessage: 'Could you bring some paint samples next time?',
-    timestamp: new Date(Date.now() - 86400000).toISOString(),
-    unread: 0,
-    project: 'Living Room Painting',
-  },
-];
+
+
 
 const ChatListScreen = ({ navigation }) => {
-  const { isHandyman } = useAuth();
-  const conversations = isHandyman ? HANDYMAN_CONVERSATIONS : CUSTOMER_CONVERSATIONS;
+  const { user, isHandyman } = useAuth();
+  const [conversations, setConversations] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
-  const formatTimestamp = (timestamp) => {
-    const messageDate = new Date(timestamp);
-    const now = new Date();
-    const diffTime = Math.abs(now - messageDate);
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  useEffect(() => {
+    if (!user?.id) return;
     
-    if (diffDays === 0) {
-      return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } else if (diffDays === 1) {
-      return 'Yesterday';
-    } else {
-      return messageDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    loadConversations();
+    
+    // Set up real-time listener
+    const unsubscribe = chatService.subscribeToConversations(
+      user.id,
+      (updatedConversations) => {
+        setConversations(updatedConversations);
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Error in conversations subscription:', error);
+        setError('Failed to load conversations');
+        setIsLoading(false);
+      }
+    );
+    
+    return () => unsubscribe && unsubscribe();
+  }, [user?.id]);
+
+  const loadConversations = async () => {
+    try {
+      setError(null);
+      const userConversations = await chatService.getUserConversations(user.id);
+      setConversations(userConversations);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      setError('Failed to load conversations');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const navigateToChat = (conversation) => {
-    navigation.navigate('Chat', { 
-      recipient: {
-        id: conversation.id,
-        name: conversation.name,
-        avatar: conversation.avatar,
-        project: conversation.project
-      } 
-    });
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadConversations();
+    setRefreshing(false);
   };
+
+  const formatTimestamp = (timestamp) => {
+      if (!timestamp) return '';
+      
+      const messageDate = new Date(timestamp);
+      const now = new Date();
+      const diffTime = Math.abs(now - messageDate);
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) {
+        return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else if (diffDays === 1) {
+        return 'Yesterday';
+      } else {
+        return messageDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      }
+    };
+
+  const navigateToChat = (conversation) => {
+      // Get the other participant's info
+      const otherParticipantId = conversation.participants.find(p => p !== user.id);
+      const otherParticipant = conversation.participantDetails?.[otherParticipantId];
+      
+      navigation.navigate('Chat', { 
+        conversationId: conversation.id,
+        recipient: {
+          id: otherParticipantId,
+          name: otherParticipant?.name || 'User',
+          avatar: getUserAvatarUri(otherParticipant),
+          role: otherParticipant?.role
+        },
+        projectId: conversation.projectId,
+        projectTitle: conversation.projectTitle
+      });
+    };
   
-  const renderConversationItem = ({ item }) => (
-    <TouchableOpacity 
-      style={[styles.conversationItem, item.isNewRequest && styles.newRequestItem]}
-      onPress={() => navigateToChat(item)}
-    >
-      <View style={styles.avatarContainer}>
-        <Image source={{ uri: item.avatar }} style={styles.avatar} />
-        {item.unread > 0 && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadText}>{item.unread}</Text>
+  const renderConversationItem = ({ item }) => {
+    // Get the other participant's info
+    const otherParticipantId = item.participants.find(p => p !== user.id);
+    const otherParticipant = item.participantDetails?.[otherParticipantId];
+    const unreadCount = item.unreadCount?.[user.id] || 0;
+    
+    return (
+      <TouchableOpacity 
+        style={styles.conversationItem}
+        onPress={() => navigateToChat(item)}
+      >
+        <View style={styles.avatarContainer}>
+          <Image 
+            source={{ uri: getUserAvatarUri(otherParticipant) }} 
+            style={styles.avatar} 
+          />
+          {unreadCount > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadText}>{unreadCount}</Text>
+            </View>
+          )}
+        </View>
+        
+        <View style={styles.conversationContent}>
+          <View style={styles.conversationHeader}>
+            <Text style={styles.name}>
+              {otherParticipant?.name || 'Unknown User'}
+            </Text>
+            <Text style={styles.timestamp}>
+              {formatTimestamp(item.lastMessageTimestamp)}
+            </Text>
           </View>
-        )}
-      </View>
-      
-      <View style={styles.conversationContent}>
-        <View style={styles.conversationHeader}>
-          <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
+          
+          {item.projectTitle && (
+            <Text style={styles.projectName}>{item.projectTitle}</Text>
+          )}
+          
+          <Text 
+            style={[styles.lastMessage, unreadCount > 0 && styles.unreadMessage]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {item.lastMessage || 'No messages yet'}
+          </Text>
         </View>
-        
-        <Text style={styles.projectName}>{item.project}</Text>
-        
-        <Text 
-          style={[styles.lastMessage, item.unread > 0 && styles.unreadMessage]}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {item.lastMessage}
-        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+if (isLoading) {
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Loading conversations...</Text>
       </View>
-      
-      {isHandyman && item.isNewRequest && (
-        <View style={styles.newRequestIndicator}>
-          <Text style={styles.newRequestText}>NEW</Text>
-        </View>
-      )}
-    </TouchableOpacity>
+    </SafeAreaView>
   );
+}
 
   return (
     <SafeAreaView style={styles.container}>
@@ -152,10 +170,24 @@ const ChatListScreen = ({ navigation }) => {
         renderItem={renderConversationItem}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[Colors.primary]}
+          />
+        }
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
             <Ionicons name="chatbubbles-outline" size={50} color="#CCC" />
-            <Text style={styles.emptyText}>No messages yet</Text>
+            <Text style={styles.emptyText}>
+              {error ? error : 'No conversations yet'}
+            </Text>
+            {error && (
+              <TouchableOpacity style={styles.retryButton} onPress={loadConversations}>
+                <Text style={styles.retryButtonText}>Try Again</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       />
@@ -265,6 +297,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     marginTop: 16,
+  },
+  loadingContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: Colors.textMedium,
+  },
+  retryButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   }
 });
 
