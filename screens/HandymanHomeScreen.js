@@ -55,18 +55,21 @@ const HandymanHomeScreen = ({ navigation }) => {
     return () => unsubscribe && unsubscribe();
   }, []);
 
-  const loadAvailableJobs = async () => {
-    try {
-      setError(null);
-      const openProjects = await projectService.getOpenProjects();
-      await enrichProjectsWithCustomerData(openProjects);
-    } catch (error) {
-      console.error('Error loading jobs:', error);
-      setError('Failed to load available jobs');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+const loadAvailableJobs = async () => {
+  try {
+    setError(null);
+    const openProjects = await projectService.getOpenProjects();
+    // Also get projects that are in negotiation with this handyman
+    const negotiatingProjects = await projectService.getNegotiatingProjectsForHandyman(user.id);
+    const allProjects = [...openProjects, ...negotiatingProjects];
+    await enrichProjectsWithCustomerData(allProjects);
+  } catch (error) {
+    console.error('Error loading jobs:', error);
+    setError('Failed to load available jobs');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const enrichProjectsWithCustomerData = async (projects) => {
     try {
@@ -213,32 +216,59 @@ const acceptJobWithDeposit = async (project, depositAmount) => {
   }
 };
   
-  const handleNegotiateJob = (project) => {
-    try {
-      // Show what negotiation means first
-      Alert.alert(
-        "💬 Start Discussion",
-        "You can discuss the project details, timeline, and budget with the customer. Would you like to proceed?",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Start Discussion",
-            onPress: () => {
-              navigation.navigate('ProjectOffer', { 
-                projectId: project.id,
-                project: project,
-                mode: 'negotiate',
-                viewMode: 'handyman'
-              });
-            }
+const handleNegotiateJob = (project) => {
+  // If already negotiating, go directly to chat
+  if (project.status === 'in_negotiation' && project.negotiatingHandymanId === user.id) {
+    handleContactCustomer(project);
+    return;
+  }
+  
+  try {
+    // Show what negotiation means first
+    Alert.alert(
+      "💬 Start Negotiation",
+      "You can discuss the project details, timeline, and budget with the customer. Would you like to proceed?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Start Discussion",
+          onPress: () => {
+            navigation.navigate('ProjectOffer', { 
+              projectId: project.id,
+              project: project,
+              mode: 'negotiate',
+              viewMode: 'handyman'
+            });
           }
-        ]
-      );
-    } catch (error) {
-      console.log("Navigation error:", error);
-      Alert.alert("Navigation Error", "Could not open negotiation screen.");
-    }
-  };
+        }
+      ]
+    );
+  } catch (error) {
+    console.log("Navigation error:", error);
+    Alert.alert("Navigation Error", "Could not open negotiation screen.");
+  }
+};
+
+const handleContactCustomer = (project) => {
+  try {
+    navigation.navigate('ChatTab', {
+      screen: 'Chat',
+      params: {
+        recipient: {
+          id: project.customerId,
+          name: project.customerName,
+          avatar: project.customerAvatar,
+          role: 'customer'
+        },
+        projectId: project.id,
+        projectTitle: project.title
+      }
+    });
+  } catch (error) {
+    console.log("Chat navigation error:", error);
+    Alert.alert("Navigation Error", "Could not open chat.");
+  }
+};
   
   const handleDeclineJob = (project) => {
     Alert.alert(
@@ -392,8 +422,10 @@ const acceptJobWithDeposit = async (project, depositAmount) => {
             onPress={() => handleNegotiateJob(item)}
             disabled={isProcessing}
           >
-            <Ionicons name="chatbubble-outline" size={16} color={Colors.primary} />
-            <Text style={styles.negotiateButtonText}>Discuss</Text>
+            <Ionicons name={item.status === 'in_negotiation' ? "chatbubbles" : "chatbubble-outline"} size={16} color={Colors.primary} />
+            <Text style={styles.negotiateButtonText}>
+              {item.status === 'in_negotiation' ? 'Continue Chat' : 'Discuss'}
+            </Text>
           </TouchableOpacity>
           
           <TouchableOpacity 

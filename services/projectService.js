@@ -25,6 +25,29 @@ export const projectService = {
     }
   },
 
+  // Get projects that are in negotiation with a specific handyman
+getNegotiatingProjectsForHandyman: async (handymanId) => {
+  try {
+    const snapshot = await db.collection('projects')
+      .where('status', '==', 'in_negotiation')
+      .where('negotiatingHandymanId', '==', handymanId)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      // Convert timestamps to ISO strings
+      createdAt: doc.data().createdAt?.toDate()?.toISOString(),
+      updatedAt: doc.data().updatedAt?.toDate()?.toISOString(),
+      preferredDate: doc.data().preferredDate?.toDate()?.toISOString(),
+    }));
+  } catch (error) {
+    console.error('Error getting negotiating projects for handyman:', error);
+    return []; // Return empty array instead of throwing
+  }
+},
+
   // Get project by ID
   getProjectById: async (projectId) => {
     try {
