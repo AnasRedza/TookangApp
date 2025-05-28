@@ -46,14 +46,13 @@ const ProjectOfferScreen = ({ route, navigation }) => {
   const successScale = useState(new Animated.Value(0))[0];
   
   // State for offer details
-  const [offerAmount, setOfferAmount] = useState('');
+  const [depositAmount, setDepositAmount] = useState('');
   const [estimatedDuration, setEstimatedDuration] = useState('');
-  const [materialsIncluded, setMaterialsIncluded] = useState(false);
   const [message, setMessage] = useState('');
   const [proposedDate, setProposedDate] = useState(null);
   const [proposedTime, setProposedTime] = useState(null);
   const [errors, setErrors] = useState({});
-  const [offerType, setOfferType] = useState('counter'); // 'accept', 'counter', 'negotiate'
+  const [offerType, setOfferType] = useState('accept');
   
   // Parse the project budget to extract values for initial offer
   useEffect(() => {
@@ -69,23 +68,7 @@ const ProjectOfferScreen = ({ route, navigation }) => {
         location: project.location
       });
       
-      let budgetValue = 100; // Default fallback
-      
-      // Try different budget field names that might exist
-      if (project.initialBudget && typeof project.initialBudget === 'number') {
-        budgetValue = project.initialBudget;
-      } else if (project.budget) {
-        if (typeof project.budget === 'number') {
-          budgetValue = project.budget;
-        } else if (typeof project.budget === 'string') {
-          budgetValue = extractBudgetFromString(project.budget);
-        }
-      } else if (project.agreedBudget && typeof project.agreedBudget === 'number') {
-        budgetValue = project.agreedBudget;
-      }
-      
-      console.log('Extracted budget value:', budgetValue);
-      setOfferAmount(budgetValue.toString());
+   
     }
     
     // Set proposed date/time from project preferences
@@ -186,11 +169,7 @@ const ProjectOfferScreen = ({ route, navigation }) => {
     }
   };
 
-  const extractBudgetFromString = (budgetString) => {
-    if (!budgetString || typeof budgetString !== 'string') return 100;
-    const match = budgetString.match(/RM(\d+)/);
-    return match ? parseInt(match[1]) : 100;
-  };
+ 
   
   // Format date for display
   const formatDate = (date) => {
@@ -261,11 +240,11 @@ const ProjectOfferScreen = ({ route, navigation }) => {
   const validateForm = () => {
     const newErrors = {};
     
-    if (offerType === 'counter' || offerType === 'accept') {
-      if (!offerAmount.trim()) {
-        newErrors.offerAmount = 'Required';
-      } else if (isNaN(offerAmount) || parseFloat(offerAmount) <= 0) {
-        newErrors.offerAmount = 'Enter a valid amount';
+    if (offerType === 'accept') {
+      if (!depositAmount.trim()) {
+        newErrors.depositAmount = 'Required';
+      } else if (isNaN(depositAmount) || parseFloat(depositAmount) <= 0) {
+        newErrors.depositAmount = 'Enter a valid amount';
       }
       
       if (!estimatedDuration.trim()) {
@@ -299,27 +278,68 @@ const ProjectOfferScreen = ({ route, navigation }) => {
   };
 
   // Handle submission of the offer/negotiation
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
+const handleSubmit = async () => {
+  if (!validateForm()) return;
+  
+  try {
+    setSubmitting(true);
     
-    try {
-      setSubmitting(true);
-      
-      if (offerType === 'negotiate') {
-        // Just start a conversation for general negotiation
-        await handleStartNegotiation();
-      } else {
-        // Submit a formal offer (accept or counter)
-        await handleSubmitOffer();
-      }
-      
-    } catch (error) {
-      console.error('Error submitting:', error);
-      Alert.alert('Error', 'Failed to submit. Please try again.');
-    } finally {
-      setSubmitting(false);
+    if (offerType === 'accept') {
+      // Direct project acceptance with deposit
+      await handleDirectAcceptance();
+    } else {
+      // Just start a conversation for negotiation
+      await handleStartNegotiation();
     }
-  };
+    
+  } catch (error) {
+    console.error('Error submitting:', error);
+    Alert.alert('Error', 'Failed to submit. Please try again.');
+  } finally {
+    setSubmitting(false);
+  }
+};
+
+const handleDirectAcceptance = async () => {
+  try {
+    // Update project directly with acceptance and deposit
+    await projectService.updateProject(project.id, {
+      status: 'accepted',
+      handymanId: user.id,
+      handymanName: user.name,
+      handymanAvatar: user.profilePicture,
+      depositAmount: parseFloat(depositAmount),
+      depositRequested: true,
+      estimatedDuration: estimatedDuration,
+      acceptedAt: new Date().toISOString()
+    });
+    
+    animateSuccess();
+    
+    setTimeout(() => {
+      setShowSuccessAnimation(false);
+      
+      Alert.alert(
+        "✅ Project Accepted!",
+        `You've accepted "${project.title}" and requested a deposit of RM${parseFloat(depositAmount).toFixed(2)}. The customer will be notified.`,
+        [
+          {
+            text: "View My Jobs",
+            onPress: () => navigation.navigate('ProjectsTab', { screen: 'MyProjects' })
+          },
+          {
+            text: "Continue Browsing",
+            onPress: () => navigation.navigate('HomeTab', { screen: 'HandymanHome' }),
+            style: "cancel"
+          }
+        ]
+      );
+    }, 1500);
+    
+  } catch (error) {
+    throw error;
+  }
+};
 
   const handleStartNegotiation = async () => {
     try {
@@ -372,86 +392,7 @@ const ProjectOfferScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleSubmitOffer = async () => {
-    try {
-      // Create offer data
-      const offerData = {
-        projectId: project.id,
-        customerId: project.customerId,
-        handymanId: user.id,
-        handymanName: user.name,
-        handymanAvatar: user.profilePicture,
-        amount: parseFloat(offerAmount),
-        originalAmount: project.initialBudget || extractBudgetFromString(project.budget),
-        estimatedDuration,
-        materialsIncluded,
-        message: message.trim(),
-        proposedDate: proposedDate?.toISOString(),
-        proposedTime: proposedTime?.toISOString(),
-        offerType, // 'accept' or 'counter'
-        projectTitle: project.title,
-        projectCategory: project.category,
-        projectLocation: project.location
-      };
-      
-      // Submit offer through service
-      await offersService.createOffer(offerData);
-      
-      // Update project status
-      const newStatus = offerType === 'accept' ? 'pending_customer_acceptance' : 'has_offers';
-      await projectService.updateProject(project.id, {
-        status: newStatus,
-        lastOfferAt: new Date().toISOString(),
-        hasOffers: true
-      });
-      
-      // Start conversation with the offer message
-      const conversationId = await chatService.createOrGetConversation(
-        user.id,
-        project.customerId,
-        { id: project.id, title: project.title }
-      );
-      
-      // Send notification message
-      const notificationMessage = offerType === 'accept' 
-        ? `I'm ready to accept your project "${project.title}" for RM${offerAmount}. Please check my formal offer details.`
-        : `I've submitted a counter-offer for your project "${project.title}". Please review the details and let me know your thoughts.`;
-        
-      await chatService.sendMessage(
-        conversationId,
-        user.id,
-        user.name,
-        notificationMessage
-      );
-      
-      animateSuccess();
-      
-      setTimeout(() => {
-        setShowSuccessAnimation(false);
-        
-        Alert.alert(
-          offerType === 'accept' ? "✅ Offer Submitted!" : "💬 Counter-Offer Sent!",
-          offerType === 'accept' 
-            ? "Your acceptance offer has been sent to the customer. They will be notified and can accept or discuss further."
-            : "Your counter-offer has been submitted. The customer will review it and get back to you.",
-          [
-            {
-              text: "View My Jobs",
-              onPress: () => navigation.navigate('ProjectsTab', { screen: 'MyProjects' })
-            },
-            {
-              text: "Continue Browsing",
-              onPress: () => navigation.navigate('HomeTab', { screen: 'HandymanHome' }),
-              style: "cancel"
-            }
-          ]
-        );
-      }, 1500);
-      
-    } catch (error) {
-      throw error;
-    }
-  };
+
   
   // Show loading if needed
   if (loading) {
@@ -516,26 +457,10 @@ const ProjectOfferScreen = ({ route, navigation }) => {
                   Accept as-is
                 </Text>
                 <Text style={styles.offerTypeSubtext}>
-                  Take the job with current terms
+                  Take the job and request deposit
                 </Text>
               </TouchableOpacity>
               
-              <TouchableOpacity
-                style={[styles.offerTypeButton, offerType === 'counter' && styles.selectedOfferType]}
-                onPress={() => setOfferType('counter')}
-              >
-                <Ionicons 
-                  name="swap-horizontal" 
-                  size={24} 
-                  color={offerType === 'counter' ? Colors.info : Colors.textLight} 
-                />
-                <Text style={[styles.offerTypeText, offerType === 'counter' && styles.selectedOfferTypeText]}>
-                  Make Counter-Offer
-                </Text>
-                <Text style={styles.offerTypeSubtext}>
-                  Propose different terms
-                </Text>
-              </TouchableOpacity>
               
               <TouchableOpacity
                 style={[styles.offerTypeButton, offerType === 'negotiate' && styles.selectedOfferType]}
@@ -561,32 +486,11 @@ const ProjectOfferScreen = ({ route, navigation }) => {
             <Text style={styles.cardTitle}>Project Summary</Text>
             <View style={styles.projectHeader}>
               <Text style={styles.categoryChip}>{project.category || 'General'}</Text>
-              <View style={styles.budgetContainer}>
-                <Text style={styles.budgetLabel}>Customer's Budget:</Text>
-                <Text style={styles.budgetValue}>
-                  {(() => {
-                    if (project.initialBudget && typeof project.initialBudget === 'number') {
-                      return `RM ${project.initialBudget}`;
-                    } else if (project.budget) {
-                      if (typeof project.budget === 'number') {
-                        return `RM ${project.budget}`;
-                      } else if (typeof project.budget === 'string') {
-                        return project.budget;
-                      }
-                    } else if (project.agreedBudget && typeof project.agreedBudget === 'number') {
-                      return `RM ${project.agreedBudget}`;
-                    }
-                    return 'RM 100';
-                  })()}
-                  {project.isNegotiable && <Text style={styles.negotiableText}> (Negotiable)</Text>}
-                </Text>
-              </View>
             </View>
             <Text style={styles.projectTitle}>{project.title || 'Untitled Project'}</Text>
             <Text style={styles.projectDescription} numberOfLines={3}>
               {project.description || 'No description available'}
             </Text>
-            
             <View style={styles.projectDetails}>
               <View style={styles.detailRow}>
                 <Ionicons name="location-outline" size={16} color={Colors.primary} />
@@ -607,105 +511,59 @@ const ProjectOfferScreen = ({ route, navigation }) => {
             </View>
           </View>
           
-          {/* Offer Details - Only show for accept/counter */}
-          {(offerType === 'accept' || offerType === 'counter') && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>
-                {offerType === 'accept' ? 'Confirm Your Acceptance' : 'Your Counter-Offer'}
-              </Text>
-              
-              {/* Price Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Your Price (RM)</Text>
-                <View style={styles.priceInputContainer}>
-                  <Text style={styles.currencySymbol}>RM</Text>
-                  <TextInput
-                    style={[styles.priceInput, errors.offerAmount && styles.inputError]}
-                    placeholder="Enter your price"
-                    value={offerAmount}
-                    onChangeText={setOfferAmount}
-                    keyboardType="number-pad"
-                    returnKeyType="done"
-                  />
-                </View>
-                {errors.offerAmount && (
-                  <Text style={styles.errorText}>{errors.offerAmount}</Text>
-                )}
-                
-                {/* Price comparison */}
-                {offerAmount && (
-                  <View style={styles.priceComparison}>
-                    <Text style={styles.comparisonText}>
-                      Customer's budget: {(() => {
-                        if (project.initialBudget && typeof project.initialBudget === 'number') {
-                          return `RM ${project.initialBudget}`;
-                        } else if (project.budget) {
-                          if (typeof project.budget === 'number') {
-                            return `RM ${project.budget}`;
-                          } else if (typeof project.budget === 'string') {
-                            return project.budget;
-                          }
-                        }
-                        return 'RM 100';
-                      })()}
-                    </Text>
-                    <Text style={[
-                      styles.differenceText,
-                      (() => {
-                        const customerBudget = project.initialBudget || 
-                          extractBudgetFromString(project.budget) || 100;
-                        return parseFloat(offerAmount) > customerBudget
-                          ? styles.higherPrice : styles.lowerPrice;
-                      })()
-                    ]}>
-                      {(() => {
-                        const customerBudget = project.initialBudget || 
-                          extractBudgetFromString(project.budget) || 100;
-                        const offerValue = parseFloat(offerAmount);
-                        
-                        if (offerValue > customerBudget) {
-                          return `+RM ${(offerValue - customerBudget).toFixed(2)} higher`;
-                        } else if (offerValue < customerBudget) {
-                          return `-RM ${(customerBudget - offerValue).toFixed(2)} lower`;
-                        } else {
-                          return 'Same as budget';
-                        }
-                      })()}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              
-              {/* Duration */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Estimated Duration</Text>
-                <TextInput
-                  style={[styles.input, errors.estimatedDuration && styles.inputError]}
-                  placeholder="e.g. 2-3 hours, 1 day"
-                  value={estimatedDuration}
-                  onChangeText={setEstimatedDuration}
-                  returnKeyType="done"
-                />
-                {errors.estimatedDuration && (
-                  <Text style={styles.errorText}>{errors.estimatedDuration}</Text>
-                )}
-              </View>
-              
-              {/* Materials Switch */}
-              <View style={styles.inputGroup}>
-                <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>Materials Included in Price</Text>
-                  <Switch
-                    value={materialsIncluded}
-                    onValueChange={setMaterialsIncluded}
-                    trackColor={{ false: Colors.inactive, true: `${Colors.secondary}80` }}
-                    thumbColor={materialsIncluded ? Colors.secondary : '#FAFAFA'}
-                    ios_backgroundColor={Colors.inactive}
-                  />
-                </View>
-              </View>
+       {/* Deposit Details - Only show for accept */}
+      {offerType === 'accept' && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Deposit Request</Text>
+    
+          {/* Deposit Input */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Deposit Amount (RM)</Text>
+            <Text style={styles.inputSubLabel}>
+              Request a deposit to secure the job. Additional payments for materials can be handled directly.
+            </Text>
+            <View style={styles.priceInputContainer}>
+              <Text style={styles.currencySymbol}>RM</Text>
+              <TextInput
+                style={[styles.priceInput, errors.depositAmount && styles.inputError]}
+                placeholder="Enter deposit amount"
+                value={depositAmount}
+                onChangeText={setDepositAmount}
+                keyboardType="number-pad"
+                returnKeyType="done"
+              />
             </View>
-          )}
+            {errors.depositAmount && (
+              <Text style={styles.errorText}>{errors.depositAmount}</Text>
+            )}
+          </View>
+          
+          {/* Duration */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Estimated Duration</Text>
+            <TextInput
+              style={[styles.input, errors.estimatedDuration && styles.inputError]}
+              placeholder="e.g. 2-3 hours, 1 day"
+              value={estimatedDuration}
+              onChangeText={setEstimatedDuration}
+              returnKeyType="done"
+            />
+            {errors.estimatedDuration && (
+              <Text style={styles.errorText}>{errors.estimatedDuration}</Text>
+            )}
+          </View>
+          
+          {/* Materials Note */}
+          <View style={styles.inputGroup}>
+            <View style={styles.noteBox}>
+              <Ionicons name="information-circle-outline" size={20} color={Colors.info} />
+              <Text style={styles.noteText}>
+                Material or addintional costs will be handled separately when you meet. Only request a deposit for your service.
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
           
           {/* Message Section */}
           <View style={styles.card}>
@@ -1200,6 +1058,19 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: Colors.textDark,
+  },
+  inputSubLabel: {
+  fontSize: 13,
+  color: Colors.textLight,
+  marginBottom: 8,
+  lineHeight: 18,
+  },
+  noteBox: {
+  flexDirection: 'row',
+  backgroundColor: 'rgba(45, 156, 219, 0.1)',
+  borderRadius: 8,
+  padding: 12,
+  alignItems: 'flex-start',
   }
 });
 

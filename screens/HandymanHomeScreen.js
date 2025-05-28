@@ -12,7 +12,9 @@ import {
   Alert,
   SafeAreaView,
   Animated,
-  Dimensions
+  Dimensions,
+  Modal, 
+  TextInput 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -30,6 +32,9 @@ const HandymanHomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [processingJobs, setProcessingJobs] = useState(new Set());
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [depositInput, setDepositInput] = useState('');
   
   useEffect(() => {
     loadAvailableJobs();
@@ -134,71 +139,85 @@ const HandymanHomeScreen = ({ navigation }) => {
     setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
   };
 
-  const handleAcceptJob = async (project) => {
-    Alert.alert(
-      "Accept Project",
-      `Are you sure you want to accept "${project.title}" for ${formatBudget(project)}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Accept", 
-          onPress: async () => {
-            setJobProcessing(project.id, true);
-            
-              try {
-                const agreedBudget = project.initialBudget || extractBudgetAmount(project.budget);
-    
-                 // Update project with complete acceptance data
-                await projectService.updateProject(project.id, {
-                  status: 'accepted',
-                  handymanId: user.id,
-                  handymanName: user.name,
-                  handymanAvatar: user.profilePicture,
-                  agreedBudget: agreedBudget,
-                  acceptedAt: new Date().toISOString()
-                });
-              
-              // Remove from available jobs list
-              removeJobFromList(project.id);
-              
-              // Show success feedback
-              Alert.alert(
-                "✅ Project Accepted!",
-                `You've successfully accepted "${project.title}". The customer has been notified and you can now start working on the project.`,
-                [
-                  { 
-                    text: "View Project",
-                    onPress: () => {
-                      // Navigate to My Projects tab to show accepted project
-                      navigation.navigate('ProjectsTab', {
-                        screen: 'MyProjects'
-                      });
-                    }
-                  },
-                  { text: "Continue Browsing", style: "cancel" }
-                ]
-              );
-              
-            } catch (error) {
-              console.error('Error accepting project:', error);
-              Alert.alert(
-                "❌ Error", 
-                "Failed to accept project. Please check your connection and try again."
-              );
-            } finally {
-              setJobProcessing(project.id, false);
-            }
-          }
+ const handleAcceptJob = async (project) => {
+  console.log('handleAccept accessed');
+  Alert.alert(
+    "Accept Project",
+    `Are you sure you want to accept "${project.title}"?`,
+    [
+      { text: "Cancel", style: "cancel" },
+      { 
+        text: "Continue", 
+        onPress: () => {
+          // Prompt for deposit instead of directly accepting
+          console.log('continue pressed');
+          promptForDepositAmount(project);
         }
+      }
+    ]
+  );
+
+};
+
+// ADD this new function to HandymanHomeScreen.js
+const promptForDepositAmount = (project) => {
+  console.log('About to show deposit prompt modal'); // ADD THIS DEBUG
+  setSelectedProject(project);
+  setShowDepositModal(true);
+};
+
+// ADD this new function to HandymanHomeScreen.js
+const acceptJobWithDeposit = async (project, depositAmount) => {
+  setJobProcessing(project.id, true);
+  
+  try {
+    // Update project with complete acceptance data including deposit
+    await projectService.updateProject(project.id, {
+      status: 'accepted',
+      handymanId: user.id,
+      handymanName: user.name,
+      handymanAvatar: user.profilePicture,
+      depositAmount: depositAmount,
+      depositRequested: true,
+      acceptedAt: new Date().toISOString()
+    });
+  
+    // Remove from available jobs list
+    removeJobFromList(project.id);
+    
+    // Show success feedback with deposit info
+    Alert.alert(
+      "✅ Project Accepted!",
+      `You've successfully accepted "${project.title}" and requested a deposit of RM${depositAmount.toFixed(2)}. The customer will be notified and can proceed with payment.`,
+      [
+        { 
+          text: "View Project",
+          onPress: () => {
+            navigation.navigate('ProjectsTab', {
+              screen: 'MyProjects'
+            });
+          }
+        },
+        { text: "Continue Browsing", style: "cancel" }
       ]
     );
-  };
+    
+  } catch (error) {
+    console.error('Error accepting project:', error);
+    Alert.alert(
+      "❌ Error", 
+      "Failed to accept project. Please check your connection and try again."
+    );
+  } finally {
+    setJobProcessing(project.id, false);
+  }
+};
   
   const handleNegotiateJob = (project) => {
     try {
       // Show what negotiation means first
       Alert.alert(
-        "💬 Start Negotiation",
+        "💬 Start Discussion",
         "You can discuss the project details, timeline, and budget with the customer. Would you like to proceed?",
         [
           { text: "Cancel", style: "cancel" },
@@ -262,11 +281,6 @@ const HandymanHomeScreen = ({ navigation }) => {
         );
       };
 
-const extractBudgetAmount = (budgetString) => {
-  if (!budgetString || typeof budgetString !== 'string') return 100;
-  const match = budgetString.match(/RM(\d+)/);
-  return match && match[1] ? parseInt(match[1]) : 100;
-};
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Flexible';
@@ -286,15 +300,6 @@ const extractBudgetAmount = (budgetString) => {
     }
   };
 
-  const formatBudget = (project) => {
-    if (project.initialBudget) {
-      return `RM ${project.initialBudget}${project.isNegotiable ? ' (Negotiable)' : ''}`;
-    }
-    if (project.budget) {
-      return project.budget;
-    }
-    return 'Budget not specified';
-  };
 
   const getUrgencyIndicator = (project) => {
     try {
@@ -346,10 +351,6 @@ const extractBudgetAmount = (budgetString) => {
             <View style={styles.detailItem}>
               <Ionicons name="location" size={14} color={Colors.primary} />
               <Text style={styles.detailText} numberOfLines={1}>{item.location}</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Ionicons name="cash-outline" size={14} color={Colors.success} />
-              <Text style={styles.detailText}>{formatBudget(item)}</Text>
             </View>
             <View style={styles.detailItem}>
               <Ionicons name="calendar-outline" size={14} color={Colors.primary} />
@@ -508,6 +509,64 @@ const extractBudgetAmount = (budgetString) => {
         ListEmptyComponent={renderEmptyState}
         ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
       />
+      {/* Deposit Input Modal */}
+<Modal
+  visible={showDepositModal}
+  transparent={true}
+  animationType="fade"
+  onRequestClose={() => setShowDepositModal(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalContent}>
+      <Text style={styles.modalTitle}>💰 Request Deposit</Text>
+      <Text style={styles.modalMessage}>
+        Enter the deposit amount you'd like to request from the customer:
+      </Text>
+      
+      <View style={styles.depositInputContainer}>
+        <Text style={styles.currencyLabel}>RM</Text>
+        <TextInput
+          style={styles.depositInput}
+          value={depositInput}
+          onChangeText={setDepositInput}
+          placeholder="Enter amount"
+          keyboardType="numeric"
+          autoFocus={true}
+        />
+      </View>
+      
+      <View style={styles.modalButtons}>
+        <TouchableOpacity 
+          style={styles.cancelButton}
+          onPress={() => {
+            setShowDepositModal(false);
+            setDepositInput('');
+            setSelectedProject(null);
+          }}
+        >
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.acceptButton}
+          onPress={() => {
+            if (!depositInput || isNaN(depositInput) || parseFloat(depositInput) <= 0) {
+              Alert.alert("Invalid Amount", "Please enter a valid deposit amount.");
+              return;
+            }
+            
+            setShowDepositModal(false);
+            acceptJobWithDeposit(selectedProject, parseFloat(depositInput));
+            setDepositInput('');
+            setSelectedProject(null);
+          }}
+        >
+          <Text style={styles.acceptButtonText}>Accept Project</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
     </SafeAreaView>
   );
 };
@@ -806,6 +865,84 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  // ADD these to your styles object
+modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: 20,
+},
+modalContent: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 16,
+  padding: 24,
+  width: '100%',
+  maxWidth: 320,
+},
+modalTitle: {
+  fontSize: 20,
+  fontWeight: 'bold',
+  color: '#333333',
+  textAlign: 'center',
+  marginBottom: 12,
+},
+modalMessage: {
+  fontSize: 16,
+  color: '#666666',
+  textAlign: 'center',
+  marginBottom: 20,
+  lineHeight: 22,
+},
+depositInputContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#DDDDDD',
+  borderRadius: 8,
+  paddingHorizontal: 12,
+  marginBottom: 20,
+},
+currencyLabel: {
+  fontSize: 16,
+  color: '#333333',
+  marginRight: 8,
+},
+depositInput: {
+  flex: 1,
+  paddingVertical: 12,
+  fontSize: 16,
+  color: '#333333',
+},
+modalButtons: {
+  flexDirection: 'row',
+  gap: 12,
+},
+cancelButton: {
+  flex: 1,
+  paddingVertical: 12,
+  borderWidth: 1,
+  borderColor: '#DDDDDD',
+  borderRadius: 8,
+  alignItems: 'center',
+},
+cancelButtonText: {
+  fontSize: 16,
+  color: '#666666',
+  fontWeight: '600',
+},
+acceptButton: {
+  flex: 1,
+  backgroundColor: Colors.success,
+  paddingVertical: 12,
+  borderRadius: 8,
+  alignItems: 'center',
+},
+acceptButtonText: {
+  fontSize: 16,
+  color: '#FFFFFF',
+  fontWeight: 'bold',
+}
 });
 
 export default HandymanHomeScreen;

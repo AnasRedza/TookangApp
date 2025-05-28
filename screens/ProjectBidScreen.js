@@ -69,7 +69,6 @@ const ProjectBidScreen = ({ route, navigation }) => {
   const SECTIONS = [
     { id: 'basic', title: 'Basic Information' }, 
     { id: 'details', title: 'Project Details' },
-    { id: 'budget', title: 'Budget' },
     { id: 'schedule', title: 'Schedule' },
     { id: 'additional', title: 'Additional Information' }
   ];
@@ -88,9 +87,7 @@ const ProjectBidScreen = ({ route, navigation }) => {
     description: '',
     category: '',
     location: '',
-    budget: '',
     images: [],
-    isNegotiable: true,
     preferredDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
     preferredTime: new Date(new Date().setHours(12, 0, 0, 0)), // Default 12:00 PM
     notes: ''
@@ -115,13 +112,13 @@ const ProjectBidScreen = ({ route, navigation }) => {
   // Calculate form completion progress
   const calculateProgress = () => {
     let filled = 0;
-    let total = 5; // Required fields: title, description, category, location, budget
+    let total = 4; // Required fields: title, description, category, location, budget
     
     if (formData.title) filled++;
     if (formData.description) filled++;
     if (formData.category) filled++;
     if (formData.location) filled++;
-    if (formData.budget) filled++;
+ 
     
     setFormProgress(filled / total);
   };
@@ -367,12 +364,6 @@ const pickImage = async () => {
       newErrors.category = 'Required';
     }
     
-    if (!formData.budget) {
-      newErrors.budget = 'Required';
-    } else if (isNaN(formData.budget) || parseFloat(formData.budget) <= 0) {
-      newErrors.budget = 'Enter a valid amount';
-    }
-    
     if (!formData.location.trim()) {
       newErrors.location = 'Required';
     }
@@ -421,8 +412,6 @@ const pickImage = async () => {
         description: formData.description.trim(),
         category: formData.category,
         location: formData.location.trim(),
-        budget: parseFloat(formData.budget),
-        isNegotiable: formData.isNegotiable,
         preferredDate: firebase.firestore.Timestamp.fromDate(formData.preferredDate),
         preferredTime: firebase.firestore.Timestamp.fromDate(formData.preferredTime),
         notes: formData.notes.trim(),
@@ -678,56 +667,11 @@ const pickImage = async () => {
               </View>
             </View>
             
-            {/* ===== SECTION: Budget ===== */}
-            <View style={styles.formSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>{SECTIONS[2].title}</Text>
-              </View>
-              
-              {/* Budget */}
-              <View style={styles.questionContainer}>
-                <View style={styles.questionLabelContainer}>
-                  <Text style={styles.questionLabel}>
-                    Budget <Text style={styles.requiredAsterisk}>*</Text>
-                  </Text>
-                </View>
-                <View style={styles.budgetContainer}>
-                  <View style={styles.currencyContainer}>
-                    <Text style={styles.currencyText}>RM</Text>
-                  </View>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      styles.budgetInput,
-                      errors.budget && styles.inputError
-                    ]}
-                    placeholder="Enter amount"
-                    keyboardType="numeric"
-                    value={formData.budget}
-                    onChangeText={(text) => handleChange('budget', text)}
-                    placeholderTextColor={Colors.textLight}
-                  />
-                </View>
-                {errors.budget && (
-                  <Text style={styles.errorText}>{errors.budget}</Text>
-                )}
-                <View style={styles.negotiableContainer}>
-                  <Text style={styles.negotiableText}>Price is negotiable</Text>
-                  <Switch
-                    value={formData.isNegotiable}
-                    onValueChange={(value) => handleChange('isNegotiable', value)}
-                    trackColor={{ false: Colors.inactive, true: `${Colors.secondary}80` }}
-                    thumbColor={formData.isNegotiable ? Colors.secondary : '#FAFAFA'}
-                    ios_backgroundColor={Colors.inactive}
-                  />
-                </View>
-              </View>
-            </View>
             
             {/* ===== SECTION: Schedule ===== */}
             <View style={styles.formSection}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>{SECTIONS[3].title}</Text>
+                <Text style={styles.sectionTitle}>{SECTIONS[2].title}</Text>
               </View>
               
               {/* Date Picker */}
@@ -766,7 +710,7 @@ const pickImage = async () => {
             {/* ===== SECTION: Additional Info ===== */}
             <View style={styles.formSection}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>{SECTIONS[4].title}</Text>
+                <Text style={styles.sectionTitle}>{SECTIONS[3].title}</Text>
               </View>
               
               {/* Project Images */}

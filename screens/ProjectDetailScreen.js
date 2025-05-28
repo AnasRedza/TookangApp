@@ -103,7 +103,6 @@ const ProjectDetailScreen = ({ route, navigation }) => {
     if (rawProject.customerName && !rawProject.customer) {
       normalizedProject = {
         ...rawProject,
-        initialBudget: extractBudgetAmount(rawProject.budget) || rawProject.initialBudget,
         customer: {
           name: rawProject.customerName,
           avatar: getUserAvatarUri({ name: rawProject.customerName, profilePicture: rawProject.customerAvatar }),
@@ -162,12 +161,7 @@ const ProjectDetailScreen = ({ route, navigation }) => {
     }
   };
   
-  // Helper functions
-  const extractBudgetAmount = (budgetString) => {
-    if (!budgetString || typeof budgetString !== 'string') return 100;
-    const match = budgetString.match(/RM(\d+)/);
-    return match && match[1] ? parseInt(match[1]) : 100;
-  };
+
   
   const getOtherParty = () => {
     if (!project) return null;
@@ -282,12 +276,14 @@ const ProjectDetailScreen = ({ route, navigation }) => {
   };
 
   const executeAction = async (action) => {
+     console.log('🔍 executeAction called with:', action); 
     setShowActionModal(false);
     setActionLoading(action);
     
     try {
       switch (action) {
         case 'accept':
+           console.log('🔍 Calling handleDirectAccept');
           await handleDirectAccept();
           break;
         case 'negotiate':
@@ -306,31 +302,93 @@ const ProjectDetailScreen = ({ route, navigation }) => {
   };
 
   // Action handlers with improved navigation
-  const handleDirectAccept = async () => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        setProjectStatus('accepted');
-        setProject(prev => ({...prev, status: 'accepted'}));
-        
-        Alert.alert(
-          "🎉 Project Accepted!",
-          "Great! You've successfully accepted this project. The customer has been notified and you can now coordinate the work.",
-          [
-            {
-              text: "View My Jobs",
-              onPress: () => {
-                navigation.navigate('ProjectsTab', {
-                  screen: 'MyProjects'
-                });
-              }
-            },
-            { text: "Continue", style: "cancel" }
-          ]
-        );
-        resolve();
-      }, 1500);
+const handleDirectAccept = async () => {
+  console.log('🔍 handleDirectAccept called');
+  return new Promise((resolve) => {
+    setTimeout(() => {
+       console.log('🔍 About to prompt for deposit');
+      promptForDeposit();
+      resolve();
+    }, 1000);
+  });
+};
+
+// ADD this new function
+const promptForDeposit = () => {
+  console.log('🔍 promptForDeposit called');
+  Alert.prompt(
+    "💰 Request Deposit",
+    "Enter the deposit amount you'd like to request from the customer:",
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+        onPress: () => {
+          // User cancelled, don't accept the project
+        }
+      },
+      {
+        text: "Accept Project",
+        onPress: (depositAmount) => {
+          if (!depositAmount || isNaN(depositAmount) || parseFloat(depositAmount) <= 0) {
+            Alert.alert("Invalid Amount", "Please enter a valid deposit amount.");
+            return;
+          }
+          
+          // Now accept the project with deposit
+          acceptProjectWithDeposit(parseFloat(depositAmount));
+        }
+      }
+    ],
+    'plain-text',
+    '',
+    'numeric'
+  );
+};
+
+// ADD this new function
+const acceptProjectWithDeposit = async (depositAmount) => {
+  try {
+    // Update project with acceptance and deposit request
+    await projectService.updateProject(project.id, {
+      status: 'accepted',
+      handymanId: user.id,
+      handymanName: user.name,
+      handymanAvatar: user.profilePicture,
+      depositAmount: depositAmount,
+      depositRequested: true,
+      acceptedAt: new Date().toISOString()
     });
-  };
+    
+    setProjectStatus('accepted');
+    setProject(prev => ({
+      ...prev, 
+      status: 'accepted',
+      depositAmount: depositAmount,
+      depositRequested: true
+    }));
+    
+    Alert.alert(
+      "🎉 Project Accepted!",
+      `Great! You've accepted this project and requested a deposit of RM${depositAmount.toFixed(2)}. The customer will be notified and can proceed with payment.`,
+      [
+        {
+          text: "View My Jobs",
+          onPress: () => {
+            navigation.navigate('ProjectsTab', {
+              screen: 'MyProjects'
+            });
+          }
+        },
+        { text: "Continue", style: "cancel" }
+      ]
+    );
+    
+  } catch (error) {
+    console.error('Error accepting project with deposit:', error);
+    Alert.alert("Error", "Failed to accept project. Please try again.");
+  }
+};
   
   const handleOpenNegotiation = async () => {
     return new Promise((resolve) => {
@@ -414,8 +472,8 @@ const ProjectDetailScreen = ({ route, navigation }) => {
       case 'accept':
         return {
           title: '✅ Accept This Project?',
-          message: `You're about to directly accept "${project?.title}" for ${budget}.\n\nThis commits you to completing the work as described. The customer will be notified immediately.`,
-          confirmText: 'Yes, Accept',
+          message: `You're about to accept "${project?.title}".\n\nYou'll be prompted to request a deposit amount from the customer.`,
+          confirmText: 'Continue',
           confirmColor: Colors.success,
           onConfirm: () => executeAction('accept')
         };
@@ -522,16 +580,6 @@ const ProjectDetailScreen = ({ route, navigation }) => {
                   <Text style={styles.categoryText}>{project.category}</Text>
                 </View>
                 <Text style={styles.postedDate}>Posted {project.postedDate || 'recently'}</Text>
-              </View>
-              <View style={styles.budgetContainer}>
-                <Text style={styles.budgetLabel}>Budget</Text>
-                <Text style={styles.budgetValue}>
-                  {formatBudget(project.budget || project.adjustedBudget || 
-                  project.agreedBudget || project.initialBudget)}
-                </Text>
-                {project.isNegotiable && (
-                  <Text style={styles.negotiableText}>Negotiable</Text>
-                )}
               </View>
             </View>
             

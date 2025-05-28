@@ -352,12 +352,12 @@ const MyProjectsScreen = ({ route, navigation }) => {
         </View>
         
         {/* Budget display */}
-        <View style={styles.budgetContainer}>
-          <Text style={styles.budgetLabel}>{isHandyman ? 'Earnings:' : 'Budget:'}</Text>
-          <Text style={styles.budgetAmount}>
-            RM {parseFloat(item.adjustedBudget || item.agreedBudget || item.initialBudget || item.budget || extractBudgetAmount(item.budget) || 0).toFixed(2)}
-          </Text>
-        </View>
+      <View style={styles.budgetContainer}>
+        <Text style={styles.budgetLabel}>{isHandyman ? 'Deposit:' : 'Deposit:'}</Text>
+        <Text style={styles.budgetAmount}>
+          {item.depositAmount ? `RM ${parseFloat(item.depositAmount).toFixed(2)}` : 'Not set'}
+        </Text>
+      </View>
         
         <View style={styles.divider} />
         
