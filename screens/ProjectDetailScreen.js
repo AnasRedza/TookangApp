@@ -1,4 +1,4 @@
-// Enhanced ProjectDetailScreen.js - Better Handyman Actions
+// Fixed ProjectDetailScreen.js - Enhanced Handyman Actions with Proper Flow
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -15,7 +15,9 @@ import {
   Platform,
   Animated
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { projectService } from '../services/projectService';
 import { getUserAvatarUri } from '../utils/imageUtils';
 import Colors from '../constants/Colors';
 
@@ -29,13 +31,12 @@ const ProjectDetailScreen = ({ route, navigation }) => {
     status = 'viewing' 
   } = route.params || {};
   
-  const { isHandyman } = useAuth();
+  const { isHandyman, user } = useAuth();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(!passedProject);
   const [projectStatus, setProjectStatus] = useState(status);
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState('');
   const [showActionModal, setShowActionModal] = useState(false);
   const [modalType, setModalType] = useState('');
@@ -58,6 +59,8 @@ const ProjectDetailScreen = ({ route, navigation }) => {
     requires_payment: '#E91E63',
     in_progress: '#03A9F4',
     disputed: '#E91E63',
+    has_offers: '#9C27B0',
+    pending_customer_acceptance: '#FF5722'
   };
 
   // Initialize project data
@@ -100,7 +103,7 @@ const ProjectDetailScreen = ({ route, navigation }) => {
     if (rawProject.customerName && !rawProject.customer) {
       normalizedProject = {
         ...rawProject,
-        initialBudget: extractBudgetAmount(rawProject.budget),
+        initialBudget: extractBudgetAmount(rawProject.budget) || rawProject.initialBudget,
         customer: {
           name: rawProject.customerName,
           avatar: getUserAvatarUri({ name: rawProject.customerName, profilePicture: rawProject.customerAvatar }),
@@ -109,25 +112,24 @@ const ProjectDetailScreen = ({ route, navigation }) => {
         },
         preferredDate: rawProject.preferredDate || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
         preferredTime: rawProject.preferredTime || 'morning',
-        status: rawProject.status || 'pending_handyman_review'
+        status: rawProject.status || 'open'
       };
     }
     
-    // Use the actual handyman data passed from route params if available
+    // Use the actual handyman data if available
     if (rawProject.handyman) {
       normalizedProject.handyman = {
         ...rawProject.handyman,
         avatar: getUserAvatarUri(rawProject.handyman)
       };
     } else if (route.params?.handyman) {
-      // Use the handyman from route params (when navigating from handyman selection)
       normalizedProject.handyman = {
         ...route.params.handyman,
         avatar: getUserAvatarUri(route.params.handyman)
       };
     }
     
-    // Use actual bidAttachments/images from Firebase
+    // Handle attachments
     if (rawProject.bidAttachments && Array.isArray(rawProject.bidAttachments)) {
       normalizedProject.bidAttachments = rawProject.bidAttachments;
     } else if (rawProject.images && Array.isArray(rawProject.images)) {
@@ -140,46 +142,32 @@ const ProjectDetailScreen = ({ route, navigation }) => {
   };
   
   // Fetch project details
-  const fetchProjectData = (id) => {
-    setLoading(true);
-    // Mock data fetch - simulate API call
-    setTimeout(() => {
-      const mockProject = {
-        id: id,
-        title: 'Fix Leaking Kitchen Sink',
-        description: 'The kitchen sink has been leaking for a week and needs repair. Water is slowly dripping from the pipes underneath the sink and collecting in a small puddle.',
-        location: 'Kuala Lumpur',
-        address: '123 Jalan Bukit Bintang, Apartment 12A, Kuala Lumpur',
-        budget: 'RM120-RM180',
-        isNegotiable: true,
-        customerName: 'Sarah Wong',
-        customerRating: 4.8,
-        customerPhone: '+60123456789',
-        postedDate: '2 days ago',
-        category: 'Plumbing',
-        distance: '3.5 km',
-        status: 'open',
-        preferredDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-        preferredTime: new Date(new Date().setHours(14, 0, 0, 0)),
-        materials: 'May need new P-trap or seals.',
-        notes: 'Water shutoff valve is located under the sink.',
-        // Use actual Firebase data - these would come from the project document
-        bidAttachments: [], // This should be populated from Firebase
-        // Add proper handyman data if this is for customer view
-        handyman: route.params?.handyman || null
-      };
-      normalizeProjectData(mockProject);
+  const fetchProjectData = async (id) => {
+    try {
+      setLoading(true);
+      const projectData = await projectService.getProjectById(id);
+      if (projectData) {
+        normalizeProjectData(projectData);
+      } else {
+        Alert.alert('Error', 'Project not found');
+        navigation.goBack();
+      }
+    } catch (error) {
+      console.error('Error fetching project:', error);
+      Alert.alert('Error', 'Failed to load project details');
+      navigation.goBack();
+    } finally {
       setLoading(false);
       animateIn();
-    }, 1000);
+    }
   };
   
   // Helper functions
-const extractBudgetAmount = (budgetString) => {
-  if (!budgetString || typeof budgetString !== 'string') return 100;
-  const match = budgetString.match(/RM(\d+)/);
-  return match && match[1] ? parseInt(match[1]) : 100;
-};
+  const extractBudgetAmount = (budgetString) => {
+    if (!budgetString || typeof budgetString !== 'string') return 100;
+    const match = budgetString.match(/RM(\d+)/);
+    return match && match[1] ? parseInt(match[1]) : 100;
+  };
   
   const getOtherParty = () => {
     if (!project) return null;
@@ -191,18 +179,18 @@ const extractBudgetAmount = (budgetString) => {
       rating: project.customerRating || 4.5 
     };
     
-const defaultHandyman = { 
-  name: project.requestedHandymanName || 'No specific handyman requested', 
-  avatar: getUserAvatarUri({ name: project.requestedHandymanName, profilePicture: project.requestedHandymanAvatar }),
-  id: project.requestedHandymanId || 'unknown', 
-  rating: 4.5 
-};
+    const defaultHandyman = { 
+      name: project.requestedHandymanName || 'Handyman', 
+      avatar: getUserAvatarUri({ name: project.requestedHandymanName, profilePicture: project.requestedHandymanAvatar }),
+      id: project.requestedHandymanId || 'unknown', 
+      rating: 4.5 
+    };
 
-const otherParty = isHandyman 
-  ? (project.customer || defaultCustomer) 
-  : (project.requestedHandyman || defaultHandyman);
+    const otherParty = isHandyman 
+      ? (project.customer || defaultCustomer) 
+      : (project.requestedHandyman || defaultHandyman);
       
-    // Ensure avatar is properly set using getUserAvatarUri
+    // Ensure avatar is properly set
     if (!otherParty.avatar || otherParty.avatar.includes('randomuser.me')) {
       otherParty.avatar = getUserAvatarUri(otherParty);
     }
@@ -268,7 +256,9 @@ const otherParty = isHandyman
       disputed: 'Disputed',
       open: isHandyman ? 'Available Job' : 'Open Project',
       accepted: isHandyman ? 'Accepted Job' : 'Accepted',
-      negotiating: 'In Negotiation'
+      negotiating: 'In Negotiation',
+      has_offers: isHandyman ? 'Offer Submitted' : 'Has Offers',
+      pending_customer_acceptance: isHandyman ? 'Awaiting Customer Response' : 'Review Offer'
     };
     
     return statusMap[status] || status;
@@ -276,10 +266,7 @@ const otherParty = isHandyman
   
   // Image gallery functions
   const hasBidAttachments = project?.bidAttachments && Array.isArray(project.bidAttachments) && project.bidAttachments.length > 0;
-  
-  // Attachments for gallery viewing
   const allImages = [...(project?.bidAttachments || [])];
-  const imagesLength = allImages.length;
   
   const openImageGallery = (index) => {
     if (hasBidAttachments) {
@@ -301,10 +288,10 @@ const otherParty = isHandyman
     try {
       switch (action) {
         case 'accept':
-          await handleAcceptProject();
+          await handleDirectAccept();
           break;
         case 'negotiate':
-          await handleNegotiateProject();
+          await handleOpenNegotiation();
           break;
         case 'decline':
           await handleDeclineProject();
@@ -318,8 +305,8 @@ const otherParty = isHandyman
     }
   };
 
-  // Action handlers
-  const handleAcceptProject = async () => {
+  // Action handlers with improved navigation
+  const handleDirectAccept = async () => {
     return new Promise((resolve) => {
       setTimeout(() => {
         setProjectStatus('accepted');
@@ -327,17 +314,17 @@ const otherParty = isHandyman
         
         Alert.alert(
           "🎉 Project Accepted!",
-          "Great! You've successfully accepted this project. The customer has been notified and you can now start coordinating the work.",
+          "Great! You've successfully accepted this project. The customer has been notified and you can now coordinate the work.",
           [
             {
-              text: "View My Projects",
+              text: "View My Jobs",
               onPress: () => {
                 navigation.navigate('ProjectsTab', {
                   screen: 'MyProjects'
                 });
               }
             },
-            { text: "Stay Here", style: "cancel" }
+            { text: "Continue", style: "cancel" }
           ]
         );
         resolve();
@@ -345,10 +332,11 @@ const otherParty = isHandyman
     });
   };
   
-  const handleNegotiateProject = async () => {
+  const handleOpenNegotiation = async () => {
     return new Promise((resolve) => {
       setTimeout(() => {
         try {
+          // Navigate to the enhanced negotiation screen
           navigation.navigate('ProjectOffer', { 
             projectId: project.id, 
             project, 
@@ -356,6 +344,7 @@ const otherParty = isHandyman
             viewMode: 'handyman'
           });
         } catch (error) {
+          console.error('Navigation error:', error);
           Alert.alert(
             "Start Discussion",
             "You can now discuss project details with the customer. Would you like to send them a message?",
@@ -396,16 +385,20 @@ const otherParty = isHandyman
     if (!otherParty) return;
     
     try {
-      navigation.navigate('Chat', {
-        recipient: {
-          id: otherParty.id || `other-${project.id}`,
-          name: otherParty.name,
-          avatar: otherParty.avatar,
-          role: isHandyman ? 'customer' : 'handyman',
-          project: project.title
-        },
-        otherUser: otherParty,
-        projectId: project.id
+      navigation.navigate('ChatTab', {
+        screen: 'Chat',
+        params: {
+          recipient: {
+            id: otherParty.id || `other-${project.id}`,
+            name: otherParty.name,
+            avatar: otherParty.avatar,
+            role: isHandyman ? 'customer' : 'handyman',
+            project: project.title
+          },
+          otherUser: otherParty,
+          projectId: project.id,
+          projectTitle: project.title
+        }
       });
     } catch (error) {
       console.log("Chat navigation error:", error);
@@ -421,16 +414,16 @@ const otherParty = isHandyman
       case 'accept':
         return {
           title: '✅ Accept This Project?',
-          message: `You're about to accept "${project?.title}" for ${budget}.\n\nThis means you commit to completing the work as described. The customer will be notified immediately.`,
+          message: `You're about to directly accept "${project?.title}" for ${budget}.\n\nThis commits you to completing the work as described. The customer will be notified immediately.`,
           confirmText: 'Yes, Accept',
           confirmColor: Colors.success,
           onConfirm: () => executeAction('accept')
         };
       case 'negotiate':
         return {
-          title: '💬 Start Negotiation?',
-          message: `You'll be able to discuss project details, timeline, and potentially adjust the budget with the customer.\n\nThis opens up a conversation channel.`,
-          confirmText: 'Start Discussion',
+          title: '💬 Open Negotiation?',
+          message: `You'll be able to:\n• Discuss project details and timeline\n• Make a counter-offer if needed\n• Accept the current terms\n• Just start a general conversation\n\nThis opens up all communication options.`,
+          confirmText: 'Open Negotiation',
           confirmColor: Colors.primary,
           onConfirm: () => executeAction('negotiate')
         };
@@ -479,6 +472,12 @@ const otherParty = isHandyman
   const otherParty = getOtherParty();
   const modalContent = getModalContent();
 
+  // Determine if handyman should see action buttons
+  const shouldShowActions = isHandyman && 
+    (viewMode === 'handyman' || project.status === 'open') && 
+    projectStatus === 'viewing' &&
+    !['accepted', 'completed', 'cancelled', 'in_progress'].includes(project.status);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -508,6 +507,13 @@ const otherParty = isHandyman
             </View>
           )}
           
+          {/* Project Status for existing projects */}
+          {project.status && project.status !== 'open' && (
+            <View style={[styles.statusBanner, { backgroundColor: STATUS_COLORS[project.status] }]}>
+              <Text style={styles.statusText}>{getStatusLabel(project.status)}</Text>
+            </View>
+          )}
+          
           {/* Project Title & Category */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -515,7 +521,7 @@ const otherParty = isHandyman
                 <View style={styles.categoryBadge}>
                   <Text style={styles.categoryText}>{project.category}</Text>
                 </View>
-                <Text style={styles.postedDate}>Posted {project.postedDate}</Text>
+                <Text style={styles.postedDate}>Posted {project.postedDate || 'recently'}</Text>
               </View>
               <View style={styles.budgetContainer}>
                 <Text style={styles.budgetLabel}>Budget</Text>
@@ -617,36 +623,36 @@ const otherParty = isHandyman
             </View>
           )}
           
-        {/* Customer/Requested Handyman Info */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{isHandyman ? 'Customer' : 'Requested Handyman'}</Text>
-          <View style={styles.userInfo}>
-            <Image 
-              source={{ uri: isHandyman ? 
-                getUserAvatarUri(project.customer || { name: project.customerName }) :
-                getUserAvatarUri({ name: project.requestedHandymanName, profilePicture: project.requestedHandymanAvatar })
-              }} 
-              style={styles.userAvatar}
-            />
-            <View style={styles.userDetails}>
-              <Text style={styles.userName}>
-                {isHandyman ? (project.customer?.name || project.customerName) : (project.requestedHandymanName || 'No specific handyman requested')}
-              </Text>
-              <View style={styles.ratingContainer}>
-                <Text style={styles.ratingValue}>
-                  {isHandyman ? (project.customer?.rating || project.customerRating || 4.5).toFixed(1) : '★'} ★
+          {/* Customer/Requested Handyman Info */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>{isHandyman ? 'Customer' : 'Requested Handyman'}</Text>
+            <View style={styles.userInfo}>
+              <Image 
+                source={{ uri: isHandyman ? 
+                  getUserAvatarUri(project.customer || { name: project.customerName }) :
+                  getUserAvatarUri({ name: project.requestedHandymanName, profilePicture: project.requestedHandymanAvatar })
+                }} 
+                style={styles.userAvatar}
+              />
+              <View style={styles.userDetails}>
+                <Text style={styles.userName}>
+                  {isHandyman ? (project.customer?.name || project.customerName) : (project.requestedHandymanName || 'No specific handyman requested')}
                 </Text>
+                <View style={styles.ratingContainer}>
+                  <Text style={styles.ratingValue}>
+                    {isHandyman ? (project.customer?.rating || project.customerRating || 4.5).toFixed(1) : '★'} ★
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
           
           {/* Bottom padding */}
           <View style={styles.bottomPadding} />
         </ScrollView>
         
         {/* Enhanced Action Buttons for Handymen */}
-        {isHandyman && (viewMode === 'handyman' || project.status === 'open') && projectStatus === 'viewing' && (
+        {shouldShowActions && (
           <View style={styles.actionContainer}>
             <View style={styles.actionButtonsContainer}>
               <TouchableOpacity 
@@ -658,6 +664,7 @@ const otherParty = isHandyman
                   <ActivityIndicator size="small" color="#E53935" />
                 ) : (
                   <>
+                    <Ionicons name="close-outline" size={20} color="#E53935" />
                     <Text style={styles.declineButtonText}>Pass</Text>
                     <Text style={styles.actionSubtext}>Not interested</Text>
                   </>
@@ -670,11 +677,12 @@ const otherParty = isHandyman
                 disabled={actionLoading !== ''}
               >
                 {actionLoading === 'negotiate' ? (
-                  <ActivityIndicator size="small" color={Colors.primary} />
+                  <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <Text style={styles.negotiateButtonText}>Discuss</Text>
-                    <Text style={styles.actionSubtext}>Talk details</Text>
+                    <Ionicons name="chatbubbles-outline" size={20} color="#FFFFFF" />
+                    <Text style={styles.negotiateButtonText}>Negotiate</Text>
+                    <Text style={styles.actionSubtext}>Discuss details</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -688,6 +696,7 @@ const otherParty = isHandyman
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
+                    <Ionicons name="checkmark-outline" size={20} color="#FFFFFF" />
                     <Text style={styles.acceptButtonText}>Accept</Text>
                     <Text style={styles.actionSubtext}>Take the job</Text>
                   </>
@@ -847,9 +856,9 @@ const styles = StyleSheet.create({
     margin: 12,
     padding: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
     elevation: 3,
   },
   cardTitle: {
@@ -1020,11 +1029,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFC107',
   },
-  reviewCount: {
-    fontSize: 12,
-    color: '#666666',
-    marginLeft: 8,
-  },
   bottomPadding: {
     height: 120,
   },
@@ -1058,7 +1062,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 12,
     flex: 1,
-    minHeight: 60,
+    minHeight: 70,
   },
   acceptButton: {
     backgroundColor: Colors.success,
@@ -1069,9 +1073,12 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   negotiateButton: {
-    backgroundColor: Colors.highlight,
-    borderWidth: 2,
-    borderColor: Colors.primary,
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   declineButton: {
     backgroundColor: '#FFF5F5',
@@ -1082,18 +1089,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    marginTop: 4,
     marginBottom: 2,
   },
   negotiateButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.primary,
+    color: '#FFFFFF',
+    marginTop: 4,
     marginBottom: 2,
   },
   declineButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#E53935',
+    marginTop: 4,
     marginBottom: 2,
   },
   actionSubtext: {
