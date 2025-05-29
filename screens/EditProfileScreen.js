@@ -37,6 +37,7 @@ const EditProfileScreen = ({ navigation }) => {
     experience: '',
     serviceCategories: [],
     profilePicture: '',
+    services: []
   });
   
   // Available service categories
@@ -67,6 +68,7 @@ const EditProfileScreen = ({ navigation }) => {
           experience: userProfile.experience?.toString() || '',
           serviceCategories: userProfile.serviceCategories || [],
           profilePicture: userProfile.profilePicture || getUserAvatarUri(userProfile),
+          services: userProfile.services || []
         });
       } else {
         // If no profile found, use user data from auth context
@@ -330,6 +332,7 @@ const EditProfileScreen = ({ navigation }) => {
         updates.hourlyRate = userData.hourlyRate ? parseFloat(userData.hourlyRate) : null;
         updates.experience = userData.experience ? parseInt(userData.experience) : null;
         updates.serviceCategories = userData.serviceCategories;
+        updates.services = userData.services.filter(service => service.name.trim() && service.price.trim());
       }
 
       console.log('🔄 Updating profile with:', updates);
@@ -520,6 +523,62 @@ const EditProfileScreen = ({ navigation }) => {
                 ))}
               </View>
             </View>
+
+            {/* Services Offered */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Common Services</Text>
+            <Text style={styles.sectionSubtitle}>Add specific services you offer with prices</Text>
+            
+            {userData.services.map((service, index) => (
+              <View key={index} style={styles.serviceItem}>
+                <View style={styles.serviceInputRow}>
+                  <TextInput
+                    style={[styles.input, styles.serviceNameInput]}
+                    placeholder="Service name (e.g., Repair Sink)"
+                    value={service.name}
+                    onChangeText={(text) => {
+                      const newServices = [...userData.services];
+                      newServices[index].name = text;
+                      handleInputChange('services', newServices);
+                    }}
+                  />
+                  <View style={styles.priceInputContainer}>
+                    <Text style={styles.currencyLabel}>RM</Text>
+                    <TextInput
+                      style={[styles.input, styles.priceInput]}
+                      placeholder="Price"
+                      value={service.price}
+                      onChangeText={(text) => {
+                        const newServices = [...userData.services];
+                        newServices[index].price = text;
+                        handleInputChange('services', newServices);
+                      }}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.removeServiceButton}
+                  onPress={() => {
+                    const newServices = userData.services.filter((_, i) => i !== index);
+                    handleInputChange('services', newServices);
+                  }}
+                >
+                  <Text style={styles.removeServiceText}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            
+            <TouchableOpacity
+              style={styles.addServiceButton}
+              onPress={() => {
+                const newServices = [...userData.services, { name: '', price: '' }];
+                handleInputChange('services', newServices);
+              }}
+            >
+              <Text style={styles.addServiceText}>+ Add Service</Text>
+            </TouchableOpacity>
+          </View>
           </>
         )}
         
@@ -706,7 +765,67 @@ const styles = StyleSheet.create({
   discardButtonText: {
     color: '#666666',
     fontSize: 16,
-  }
+  },
+  serviceItem: {
+  marginBottom: 16,
+  padding: 16,
+  backgroundColor: '#F8F9FA',
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: '#E0E0E0',
+},
+serviceInputRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+serviceNameInput: {
+  flex: 2,
+  marginRight: 12,
+},
+priceInputContainer: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#DDDDDD',
+  borderRadius: 8,
+  backgroundColor: '#FAFAFA',
+},
+currencyLabel: {
+  paddingHorizontal: 12,
+  fontSize: 14,
+  color: '#666666',
+  fontWeight: '500',
+},
+priceInput: {
+  flex: 1,
+  borderWidth: 0,
+  paddingLeft: 0,
+  backgroundColor: 'transparent',
+},
+removeServiceButton: {
+  alignSelf: 'flex-end',
+  paddingVertical: 4,
+  paddingHorizontal: 8,
+},
+removeServiceText: {
+  color: '#E53935',
+  fontSize: 12,
+  fontWeight: '500',
+},
+addServiceButton: {
+  backgroundColor: Colors.primary,
+  paddingVertical: 12,
+  borderRadius: 8,
+  alignItems: 'center',
+  marginTop: 8,
+},
+addServiceText: {
+  color: '#FFFFFF',
+  fontSize: 14,
+  fontWeight: '600',
+},
 });
 
 export default EditProfileScreen;

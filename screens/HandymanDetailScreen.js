@@ -197,6 +197,21 @@ const loadHandymanDetails = async () => {
           </View>
         )}
 
+        {/* Services & Prices */}
+        {handyman.services && handyman.services.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Common Services</Text>
+            <View style={styles.servicesGrid}>
+              {handyman.services.map((service, index) => (
+                <View key={index} style={styles.serviceCard}>
+                  <Text style={styles.serviceName}>{service.name}</Text>
+                  <Text style={styles.servicePrice}>RM {parseFloat(service.price).toFixed(2)}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* About Section */}
         {handyman.bio && (
           <View style={styles.section}>
@@ -508,7 +523,35 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.primary,
     fontWeight: '500',
-  }
+  },
+  servicesGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  marginHorizontal: -4,
+  marginTop: 8,
+},
+serviceCard: {
+  backgroundColor: '#F8F9FA',
+  borderWidth: 1,
+  borderColor: '#E0E0E0',
+  borderRadius: 8,
+  padding: 12,
+  margin: 4,
+  minWidth: '45%',
+  alignItems: 'center',
+},
+serviceName: {
+  fontSize: 14,
+  fontWeight: '500',
+  color: '#333333',
+  textAlign: 'center',
+  marginBottom: 4,
+},
+servicePrice: {
+  fontSize: 16,
+  fontWeight: 'bold',
+  color: Colors.primary,
+},
 });
 
 export default HandymanDetailScreen;

@@ -241,6 +241,22 @@ const ProfileScreen = ({ navigation }) => {
                 </View>
               </View>
             )}
+
+            {/* Services & Prices */}
+              {isHandyman && userProfile.services && userProfile.services.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Common Services</Text>
+                  
+                  <View style={styles.servicesGrid}>
+                    {userProfile.services.map((service, index) => (
+                      <View key={index} style={styles.serviceCard}>
+                        <Text style={styles.serviceName}>{service.name}</Text>
+                        <Text style={styles.servicePrice}>RM {parseFloat(service.price).toFixed(2)}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
           </>
         )}
 
@@ -495,6 +511,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#CCCCCC',
   },
+  servicesGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  marginHorizontal: -4,
+},
+serviceCard: {
+  backgroundColor: Colors.card,
+  borderWidth: 1,
+  borderColor: Colors.border,
+  borderRadius: 8,
+  padding: 12,
+  margin: 4,
+  minWidth: '45%',
+  alignItems: 'center',
+},
+serviceName: {
+  fontSize: 14,
+  fontWeight: '500',
+  color: Colors.textDark,
+  textAlign: 'center',
+  marginBottom: 4,
+},
+servicePrice: {
+  fontSize: 16,
+  fontWeight: 'bold',
+  color: Colors.primary,
+},
 });
 
 export default ProfileScreen;

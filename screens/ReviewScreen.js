@@ -222,14 +222,7 @@ const ReviewScreen = ({ route, navigation }) => {
           <View style={styles.projectCard}>
             <Text style={styles.projectTitle}>{project.title}</Text>
             <Text style={styles.projectCategory}>{project.category}</Text>
-            <View style={styles.projectBudget}>
-              <Text style={styles.projectBudgetLabel}>
-                {isHandyman ? 'Earnings:' : 'Budget:'}
-              </Text>
-              <Text style={styles.projectBudgetValue}>
-                RM {parseFloat(project.adjustedBudget || project.agreedBudget || project.initialBudget).toFixed(2)}
-              </Text>
-            </View>
+          
             
             {/* Show completion date if available */}
             {project.completedAt && (

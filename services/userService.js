@@ -336,5 +336,35 @@ createUser: async (userId, userData) => {
       console.error('Error updating user location:', error);
       throw error;
     }
+  },
+
+  // Update handyman services
+updateHandymanServices: async (handymanId, services) => {
+  try {
+    await db.collection('users').doc(handymanId).update({
+      services: services,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    return true;
+  } catch (error) {
+    console.error('Error updating handyman services:', error);
+    throw error;
   }
+},
+
+// Get handyman services
+getHandymanServices: async (handymanId) => {
+  try {
+    const userDoc = await db.collection('users').doc(handymanId).get();
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      return userData.services || [];
+    }
+    return [];
+  } catch (error) {
+    console.error('Error getting handyman services:', error);
+    return [];
+  }
+}
+
 };
