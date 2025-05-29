@@ -41,8 +41,9 @@ const HandymanHomeScreen = ({ navigation }) => {
   useEffect(() => {
     loadAvailableJobs();
     
-    // Set up real-time listener for open projects
-    const unsubscribe = projectService.subscribeToOpenProjects(
+    // Set up real-time listener for this handyman's projects
+    const unsubscribe = projectService.subscribeToHandymanProjects(
+      user.id,
       (projects) => {
         enrichProjectsWithCustomerData(projects);
         setIsLoading(false);
@@ -53,17 +54,17 @@ const HandymanHomeScreen = ({ navigation }) => {
         setIsLoading(false);
       }
     );
-    
     return () => unsubscribe && unsubscribe();
   }, []);
-
+    
 const loadAvailableJobs = async () => {
   try {
     setError(null);
-    const openProjects = await projectService.getOpenProjects();
+    // Get projects specifically requested for this handyman
+    const directHireProjects = await projectService.getProjectsForHandyman(user.id);
     // Also get projects that are in negotiation with this handyman
     const negotiatingProjects = await projectService.getNegotiatingProjectsForHandyman(user.id);
-    const allProjects = [...openProjects, ...negotiatingProjects];
+    const allProjects = [...directHireProjects, ...negotiatingProjects];
     await enrichProjectsWithCustomerData(allProjects);
   } catch (error) {
     console.error('Error loading jobs:', error);

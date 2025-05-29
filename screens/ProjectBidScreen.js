@@ -472,7 +472,7 @@ try {
         customerId: user.id,
         customerName: user.name,
         customerEmail: user.email,
-        status: 'open',
+        status: 'pending_handyman_review', // All projects are direct hire
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         // Requested handyman info (from handyman parameter)

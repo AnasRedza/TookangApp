@@ -70,6 +70,62 @@ getNegotiatingProjectsForHandyman: async (handymanId) => {
   }
 },
 
+// Get projects specifically requested for a handyman (direct hire)
+getProjectsForHandyman: async (handymanId) => {
+  try {
+    const snapshot = await db.collection('projects')
+      .where('status', '==', 'pending_handyman_review')
+      .where('requestedHandymanId', '==', handymanId)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      // Convert timestamps to ISO strings
+      createdAt: doc.data().createdAt?.toDate()?.toISOString(),
+      updatedAt: doc.data().updatedAt?.toDate()?.toISOString(),
+      preferredDate: doc.data().preferredDate?.toDate()?.toISOString(),
+    }));
+  } catch (error) {
+    console.error('Error getting projects for handyman:', error);
+    return []; // Return empty array instead of throwing
+  }
+},
+
+// Subscribe to projects specifically for a handyman
+subscribeToHandymanProjects: (handymanId, onUpdate, onError) => {
+  try {
+    const unsubscribe = db.collection('projects')
+      .where('requestedHandymanId', '==', handymanId)
+      .where('status', 'in', ['pending_handyman_review', 'in_negotiation'])
+      .orderBy('createdAt', 'desc')
+      .onSnapshot(
+        (snapshot) => {
+          const projects = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            // Convert timestamps to ISO strings
+            createdAt: doc.data().createdAt?.toDate()?.toISOString(),
+            updatedAt: doc.data().updatedAt?.toDate()?.toISOString(),
+            preferredDate: doc.data().preferredDate?.toDate()?.toISOString(),
+          }));
+          onUpdate(projects);
+        },
+        (error) => {
+          console.error('Error in handyman projects subscription:', error);
+          if (onError) onError(error);
+        }
+      );
+    
+    return unsubscribe;
+  } catch (error) {
+    console.error('Error setting up handyman projects subscription:', error);
+    if (onError) onError(error);
+    return null;
+  }
+},
+
   // Get project by ID
 getProjectById: async (projectId) => {
   try {

@@ -240,7 +240,7 @@ const ProjectDetailScreen = ({ route, navigation }) => {
     }
   };
   
-  const getStatusLabel = (status) => {
+const getStatusLabel = (status) => {
     const statusMap = {
       pending_handyman_review: isHandyman ? 'New Job Request' : 'Pending Review',
       in_negotiation: isHandyman ? 'In Discussion' : 'In Negotiation',
@@ -251,7 +251,6 @@ const ProjectDetailScreen = ({ route, navigation }) => {
       completed: 'Completed',
       cancelled: 'Cancelled',
       disputed: 'Disputed',
-      open: isHandyman ? 'Available Job' : 'Open Project',
       accepted: isHandyman ? 'Accepted Job' : 'Accepted',
       negotiating: 'In Negotiation',
       has_offers: isHandyman ? 'Offer Submitted' : 'Has Offers',
@@ -605,8 +604,8 @@ const promptForDeposit = () => {
   const modalContent = getModalContent();
 
   // Determine if handyman should see action buttons
-  const shouldShowActions = isHandyman && 
-    (viewMode === 'handyman' || project.status === 'open') && 
+const shouldShowActions = isHandyman && 
+    (viewMode === 'handyman' || project.status === 'pending_handyman_review') && 
     projectStatus === 'viewing' &&
     !['accepted', 'completed', 'cancelled', 'in_progress'].includes(project.status);
 
