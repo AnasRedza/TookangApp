@@ -19,6 +19,7 @@ import { userService } from '../services/userService';
 import Colors from '../constants/Colors';
 import firebase from '../firebase';
 import { getUserAvatarUri } from '../utils/imageUtils';
+import { reviewService } from '../services/reviewService';
 
 
 const MyProjectsScreen = ({ route, navigation }) => {
@@ -301,8 +302,23 @@ const handleConfirmCompletion = async (project) => {
   );
 };
 
-const handleLeaveReview = (project) => {
+const handleLeaveReview = async (project) => {
   const userToReview = isHandyman ? 'customer' : 'handyman';
+  
+  // Check if user has already reviewed this project
+  try {
+    const hasReviewed = await reviewService.hasUserReviewedProject(user.id, project.id);
+    if (hasReviewed) {
+      Alert.alert(
+        "Already Reviewed",
+        "You have already submitted a review for this project.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+  } catch (error) {
+    console.error('Error checking review status:', error);
+  }
   
   navigation.navigate('ReviewScreen', {
     project: project,
@@ -313,14 +329,18 @@ const handleLeaveReview = (project) => {
     },
     userType: userToReview,
     onReviewSubmitted: (reviewData) => {
-      // Mark that review has been submitted for this project
-      projectService.updateProject(project.id, {
-        [`${user.role}ReviewSubmitted`]: true,
-        [`${user.role}ReviewData`]: reviewData
-      });
+      // Update local project state to reflect review submission
+      setProjects(prevProjects => 
+        prevProjects.map(p => 
+          p.id === project.id 
+            ? { ...p, [`${user.role}ReviewSubmitted`]: true }
+            : p
+        )
+      );
     }
   });
 };
+
 
   // Format date
   const formatDate = (dateString) => {
@@ -522,7 +542,7 @@ const getStatusColor = (status) => {
         )}
         
         {/* Both can leave reviews when completed */}
-        {item.status === 'completed' && !item.reviewSubmitted && (
+        {item.status === 'completed' && !item[`${user.role}ReviewSubmitted`] && (
           <TouchableOpacity 
             style={styles.reviewButton}
             onPress={() => handleLeaveReview(item)}

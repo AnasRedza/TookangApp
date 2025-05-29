@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { userService } from '../services/userService';
 import { getUserAvatarUri } from '../utils/imageUtils';
 import Colors from '../constants/Colors';
+// ADD this import under the existing imports:
+import { reviewService } from '../services/reviewService';
 
 const HandymanDetailScreen = ({ route, navigation }) => {
   const { handyman: initialHandyman } = route.params || {};
@@ -28,44 +30,28 @@ const HandymanDetailScreen = ({ route, navigation }) => {
     }
   }, [initialHandyman]);
 
-  const loadHandymanDetails = async () => {
-    if (!initialHandyman?.id) return;
+// REPLACE the loadHandymanDetails function with this:
+const loadHandymanDetails = async () => {
+  if (!initialHandyman?.id) return;
 
-    try {
-      setIsLoading(true);
-      const handymanData = await userService.getUserById(initialHandyman.id);
-      if (handymanData) {
-        setHandyman(handymanData);
-      }
-      
-      // Load reviews (you would implement this service)
-      // const reviewsData = await reviewService.getUserReviews(initialHandyman.id);
-      // setReviews(reviewsData);
-      
-      // For now, use mock reviews
-      setReviews([
-        {
-          id: '1',
-          user: 'Sarah L.',
-          rating: 5,
-          date: '3 days ago',
-          comment: 'Excellent service! Very professional and completed the job quickly.',
-        },
-        {
-          id: '2',
-          user: 'James T.',
-          rating: 4,
-          date: '1 week ago',
-          comment: 'Good work overall, but took a little longer than expected.',
-        },
-      ]);
-    } catch (error) {
-      console.error('Error loading handyman details:', error);
-      Alert.alert('Error', 'Failed to load handyman details');
-    } finally {
-      setIsLoading(false);
+  try {
+    setIsLoading(true);
+    const handymanData = await userService.getUserById(initialHandyman.id);
+    if (handymanData) {
+      setHandyman(handymanData);
     }
-  };
+    
+    // Load real reviews from Firebase
+    const reviewsData = await reviewService.getUserReviews(initialHandyman.id, 5);
+    setReviews(reviewsData);
+    
+  } catch (error) {
+    console.error('Error loading handyman details:', error);
+    Alert.alert('Error', 'Failed to load handyman details');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleHireNow = () => {
     navigation.navigate('ProjectBid', { handyman });
@@ -237,29 +223,42 @@ const HandymanDetailScreen = ({ route, navigation }) => {
           
           {reviews.length > 0 ? (
             <>
-              {reviews.map(review => (
-                <View key={review.id} style={styles.reviewCard}>
-                  <View style={styles.reviewHeader}>
-                    <Text style={styles.reviewerName}>{review.user}</Text>
-                    <Text style={styles.reviewDate}>{review.date}</Text>
-                  </View>
+    {reviews.map(review => (
+      <View key={review.id} style={styles.reviewCard}>
+        <View style={styles.reviewHeader}>
+          <Text style={styles.reviewerName}>{review.reviewerName}</Text>
+          <Text style={styles.reviewDate}>
+            {new Date(review.createdAt).toLocaleDateString()}
+          </Text>
+        </View>
+        
+        <View style={styles.ratingRow}>
+          {[1, 2, 3, 4, 5].map(i => (
+            <Ionicons 
+              key={i} 
+              name={i <= review.rating ? "star" : "star-outline"} 
+              size={14} 
+              color="#FFD700" 
+              style={{marginRight: 2}} 
+            />
+          ))}
+        </View>
+        
+        <Text style={styles.reviewText}>{review.reviewText}</Text>
+        
+        {/* Show selected tags if they exist */}
+        {review.selectedTags && review.selectedTags.length > 0 && (
+          <View style={styles.tagsContainer}>
+            {review.selectedTags.map((tag, index) => (
+              <View key={index} style={styles.tagChip}>
+                <Text style={styles.tagText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    ))}
                   
-                  <View style={styles.ratingRow}>
-                    {[1, 2, 3, 4, 5].map(i => (
-                      <Ionicons 
-                        key={i} 
-                        name={i <= review.rating ? "star" : "star-outline"} 
-                        size={14} 
-                        color="#FFD700" 
-                        style={{marginRight: 2}} 
-                      />
-                    ))}
-                  </View>
-                  
-                  <Text style={styles.reviewText}>{review.comment}</Text>
-                </View>
-              ))}
-              
               <TouchableOpacity style={styles.viewAllButton}>
                 <Text style={styles.viewAllText}>View All Reviews</Text>
               </TouchableOpacity>
@@ -492,6 +491,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999999',
   },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  tagChip: {
+    backgroundColor: Colors.highlight,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 6,
+    marginBottom: 4,
+  },
+  tagText: {
+    fontSize: 11,
+    color: Colors.primary,
+    fontWeight: '500',
+  }
 });
 
 export default HandymanDetailScreen;

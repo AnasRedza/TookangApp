@@ -17,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { useAuth } from '../context/AuthContext';
 import { projectService } from '../services/projectService';
+// ADD this import under the existing imports:
+import { reviewService } from '../services/reviewService';
 
 const ReviewScreen = ({ route, navigation }) => {
   // Get params passed from MyProjectsScreen
@@ -93,7 +95,7 @@ const ReviewScreen = ({ route, navigation }) => {
   const reviewee = getPersonBeingReviewed();
   
   // Handle review submission
-  const handleSubmitReview = () => {
+ const handleSubmitReview = async () => {
   // Validation
   if (reviewText.trim().length < 5) {
     Alert.alert(
@@ -106,52 +108,51 @@ const ReviewScreen = ({ route, navigation }) => {
   
   setIsSubmitting(true);
   
-  // Create review data
-  const reviewData = {
-    rating,
-    reviewText,
-    selectedTags: tags.filter(tag => tag.selected).map(tag => tag.label),
-    reviewerType: user.role, // 'customer' or 'handyman'
-    revieweeType: userType, // The type of user being reviewed
-    reviewerId: user.id,
-    reviewerName: user.name,
-    revieweeId: userToReview.id,
-    revieweeName: userToReview.name,
-    projectId: project.id,
-    projectTitle: project.title,
-    reviewedAt: new Date().toISOString()
-  };
-  
-  // Simulate API call to save review
-  setTimeout(async () => {
-    try {
-      // Update project to mark that this user has submitted a review
-      await projectService.updateProject(project.id, {
-        [`${user.role}ReviewSubmitted`]: true,
-        [`${user.role}ReviewData`]: reviewData,
-        [`lastReviewAt`]: new Date().toISOString()
-      });
-      
-      // In a real app, you would also save the review to a reviews collection
-      // await reviewService.createReview(reviewData);
-      
-      setIsSubmitting(false);
-      
-      if (onReviewSubmitted) {
-        onReviewSubmitted(reviewData);
-      }
-      
-      Alert.alert(
-        "Review Submitted", 
-        "Thank you for your feedback! Your review helps other users make better decisions.",
-        [{ text: "OK", onPress: () => navigation.goBack() }]
-      );
-    } catch (error) {
-      console.error('Error submitting review:', error);
-      setIsSubmitting(false);
-      Alert.alert("Error", "Failed to submit review. Please try again.");
+  try {
+    // Import reviewService at the top of the file
+    const { reviewService } = require('../services/reviewService');
+    
+    // Create review data
+    const reviewData = {
+      rating,
+      reviewText,
+      selectedTags: tags.filter(tag => tag.selected).map(tag => tag.label),
+      reviewerType: user.role, // 'customer' or 'handyman'
+      revieweeType: userType, // The type of user being reviewed
+      reviewerId: user.id,
+      reviewerName: user.name,
+      reviewerAvatar: user.profilePicture,
+      revieweeId: userToReview.id,
+      revieweeName: userToReview.name,
+      projectId: project.id,
+      projectTitle: project.title
+    };
+    
+    // Save review to Firebase
+    await reviewService.createReview(reviewData);
+    
+    // Update project to mark that this user has submitted a review
+    await projectService.updateProject(project.id, {
+      [`${user.role}ReviewSubmitted`]: true,
+      [`lastReviewAt`]: new Date().toISOString()
+    });
+    
+    setIsSubmitting(false);
+    
+    if (onReviewSubmitted) {
+      onReviewSubmitted(reviewData);
     }
-  }, 1000);
+    
+    Alert.alert(
+      "Review Submitted", 
+      "Thank you for your feedback! Your review helps other users make better decisions.",
+      [{ text: "OK", onPress: () => navigation.goBack() }]
+    );
+  } catch (error) {
+    console.error('Error submitting review:', error);
+    setIsSubmitting(false);
+    Alert.alert("Error", "Failed to submit review. Please try again.");
+  }
 };
   
   // Render star rating

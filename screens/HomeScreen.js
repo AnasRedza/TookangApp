@@ -16,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { userService } from '../services/userService';
 import { getUserAvatarUri } from '../utils/imageUtils';
 import Colors from '../constants/Colors';
+// ADD this import:
+import { reviewService } from '../services/reviewService';
 
 // Updated categories - only 5 as requested
 const CATEGORIES = [
@@ -44,15 +46,33 @@ const HomeScreen = ({ navigation }) => {
     filterHandymenByCategory();
   }, [selectedCategory, allHandymen]);
 
- const loadHandymen = async () => {
+// REPLACE the loadHandymen function with this:
+const loadHandymen = async () => {
   try {
     setError(null);
     console.log('🔍 Loading handymen...');
     const handymenData = await userService.getTopRatedHandymen(20);
-    console.log('📊 Handymen loaded:', handymenData.length);
-    console.log('👥 First handyman:', handymenData[0]);
-    setAllHandymen(handymenData);
-    setHandymen(handymenData);
+    
+    // Enrich with real review data
+    const enrichedHandymen = await Promise.all(
+      handymenData.map(async (handyman) => {
+        try {
+          const reviewStats = await reviewService.getUserReviewStats(handyman.id);
+          return {
+            ...handyman,
+            rating: reviewStats.averageRating || 0,
+            reviewCount: reviewStats.totalReviews || 0
+          };
+        } catch (error) {
+          console.error('Error getting review stats for handyman:', handyman.id, error);
+          return handyman;
+        }
+      })
+    );
+    
+    console.log('📊 Handymen loaded:', enrichedHandymen.length);
+    setAllHandymen(enrichedHandymen);
+    setHandymen(enrichedHandymen);
   } catch (error) {
     console.error('❌ Error loading handymen:', error);
     setError('Failed to load handymen. Please try again.');
