@@ -20,6 +20,9 @@ import { useAuth } from '../context/AuthContext';
 import { projectService } from '../services/projectService';
 import { getUserAvatarUri } from '../utils/imageUtils';
 import Colors from '../constants/Colors';
+import { scheduleService } from '../services/scheduleService';
+import firebase from '../firebase';
+
 
 const { width } = Dimensions.get('window');
 
@@ -303,14 +306,60 @@ const ProjectDetailScreen = ({ route, navigation }) => {
 
   // Action handlers with improved navigation
 const handleDirectAccept = async () => {
-  console.log('🔍 handleDirectAccept called');
-  return new Promise((resolve) => {
-    setTimeout(() => {
-       console.log('🔍 About to prompt for deposit');
-      promptForDeposit();
-      resolve();
-    }, 1000);
-  });
+  console.log('🔍 handleDirectAccept with schedule check');
+  
+  try {
+    // Check for schedule conflicts first
+    const projectDate = new Date(project.preferredDate);
+    const conflict = await scheduleService.checkScheduleConflict(
+      user.id, 
+      projectDate
+    );
+    
+    if (conflict.hasConflict) {
+      // Show conflict information
+      const conflictMessage = scheduleService.formatConflictMessage(conflict.conflictingProjects);
+      
+      Alert.alert(
+        "⚠️ Schedule Conflict",
+        `${conflictMessage}\n\nWould you like to:\n• Negotiate a different date\n• Accept anyway (not recommended)`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Negotiate Date",
+            onPress: () => {
+              navigation.navigate('ProjectOffer', { 
+                projectId: project.id,
+                project: project,
+                mode: 'negotiate_schedule',
+                viewMode: 'handyman'
+              });
+            }
+          },
+          {
+            text: "Accept Anyway",
+            style: "destructive",
+            onPress: () => promptForDeposit()
+          }
+        ]
+      );
+      return;
+    }
+    
+    // No conflict, proceed with deposit prompt
+    promptForDeposit();
+    
+  } catch (error) {
+    console.error('Error checking schedule:', error);
+    Alert.alert(
+      'Schedule Check Failed', 
+      'Unable to verify your availability. Would you like to proceed anyway?',
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Continue", onPress: () => promptForDeposit() }
+      ]
+    );
+  }
 };
 
 // ADD this new function
@@ -349,40 +398,50 @@ const promptForDeposit = () => {
 // ADD this new function
   const acceptProjectWithDeposit = async (depositAmount) => {
     try {
-      // Update project with acceptance and deposit request
-      await projectService.updateProject(project.id, {
-        status: 'awaiting_payment', // Changed from 'accepted' to 'awaiting_payment'
-        handymanId: user.id,
-        handymanName: user.name,
-        handymanAvatar: user.profilePicture,
-        depositAmount: depositAmount,
-        depositRequested: true,
-        acceptedAt: new Date().toISOString()
-      });
+    const projectStartDate = new Date(project.preferredDate);
+    const estimatedDurationHours = 4; // Default 4 hours duration
+    const projectEndDate = new Date(projectStartDate.getTime() + estimatedDurationHours * 60 * 60 * 1000);
+    
+    // Update project with complete acceptance data including schedule
+    await projectService.updateProject(project.id, {
+      status: 'awaiting_payment',
+      handymanId: user.id,
+      handymanName: user.name,
+      handymanAvatar: user.profilePicture,
+      depositAmount: depositAmount,
+      depositRequested: true,
+      acceptedAt: new Date().toISOString(),
+      // Add schedule information
+      scheduledStartDate: firebase.firestore.Timestamp.fromDate(projectStartDate),
+      scheduledEndDate: firebase.firestore.Timestamp.fromDate(projectEndDate),
+      estimatedDurationHours: estimatedDurationHours
+    });
       
-      setProjectStatus('awaiting_payment');
-      setProject(prev => ({
-        ...prev, 
-        status: 'awaiting_payment',
-        depositAmount: depositAmount,
-        depositRequested: true
-      }));
-      
-      Alert.alert(
-        "🎉 Project Accepted!",
-        `Great! You've accepted this project and requested a deposit of RM${depositAmount.toFixed(2)}. The customer will be notified and can proceed with payment.`,
-        [
-          {
-            text: "View My Jobs",
-            onPress: () => {
-              navigation.navigate('ProjectsTab', {
-                screen: 'MyProjects'
-              });
-            }
-          },
-          { text: "Continue", style: "cancel" }
-        ]
-      );
+    setProjectStatus('awaiting_payment');
+    setProject(prev => ({
+      ...prev, 
+      status: 'awaiting_payment',
+      depositAmount: depositAmount,
+      depositRequested: true,
+      scheduledStartDate: projectStartDate,
+      scheduledEndDate: projectEndDate
+    }));
+
+    Alert.alert(
+      "🎉 Project Accepted!",
+      `Great! You've accepted this project for ${projectStartDate.toLocaleDateString()} and requested a deposit of RM${depositAmount.toFixed(2)}. The customer will be notified.`,
+      [
+        {
+          text: "View My Jobs",
+          onPress: () => {
+            navigation.navigate('ProjectsTab', {
+              screen: 'MyProjects'
+            });
+          }
+        },
+        { text: "Continue", style: "cancel" }
+      ]
+    );
       
     } catch (error) {
       console.error('Error accepting project with deposit:', error);

@@ -47,6 +47,8 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password, selectedRole) => {
+
+  console.log('Attempting login for:', email, 'with selected role:', selectedRole);
     try {
       // First, authenticate with Firebase
       const userCredential = await auth.signInWithEmailAndPassword(email, password);
@@ -82,6 +84,12 @@ export const AuthProvider = ({ children }) => {
       return { success: true };
       
     } catch (error) {
+
+          if (error.code === 'auth/network-request-failed') {
+        console.log('Network error detected during login:', error.message);
+      } else {
+        console.log('Firebase auth error code:', error.code);
+      }
       let errorMessage = 'Authentication failed. Please try again.';
       if (error.code === 'auth/user-not-found') {
         errorMessage = 'No account found with this email address.';

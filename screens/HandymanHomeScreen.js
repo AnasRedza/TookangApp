@@ -22,6 +22,8 @@ import { projectService } from '../services/projectService';
 import { userService } from '../services/userService';
 import { getUserAvatarUri } from '../utils/imageUtils';
 import Colors from '../constants/Colors';
+import { scheduleService } from '../services/scheduleService';
+import firebase from '../firebase';
 
 const { width } = Dimensions.get('window');
 
@@ -142,24 +144,107 @@ const loadAvailableJobs = async () => {
     setJobs(prevJobs => prevJobs.filter(job => job.id !== jobId));
   };
 
- const handleAcceptJob = async (project) => {
-  console.log('handleAccept accessed');
+const handleAcceptJob = async (project) => {
+  console.log('handleAcceptJob with schedule check');
+  
+  try {
+    // First check for schedule conflicts
+    const projectDate = new Date(project.preferredDate);
+    const conflict = await scheduleService.checkScheduleConflict(
+      user.id, 
+      projectDate
+    );
+    
+    if (conflict.hasConflict) {
+      // Show conflict dialog with options
+      showScheduleConflictDialog(project, conflict);
+      return;
+    }
+    
+    // No conflict, proceed with normal acceptance
+    Alert.alert(
+      "Accept Project",
+      `Are you sure you want to accept "${project.title}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Continue", 
+          onPress: () => {
+            console.log('continue pressed');
+            promptForDepositAmount(project);
+          }
+        }
+      ]
+    );
+    
+  } catch (error) {
+    console.error('Error checking schedule:', error);
+    Alert.alert(
+      'Error', 
+      'Unable to check your schedule at the moment. Please try again.'
+    );
+  }
+};
+
+const showScheduleConflictDialog = async (project, conflict) => {
+  const conflictMessage = scheduleService.formatConflictMessage(conflict.conflictingProjects);
+  
+  // Get alternative dates
+  const alternatives = await scheduleService.suggestAlternativeDates(
+    user.id, 
+    new Date(project.preferredDate),
+    7
+  );
+  
+  let alertMessage = `⚠️ Schedule Conflict\n\n${conflictMessage}`;
+  
+  if (alternatives.length > 0) {
+    alertMessage += `\n\nSuggested alternative dates:\n`;
+    alternatives.slice(0, 3).forEach((date, index) => {
+      alertMessage += `• ${date.toLocaleDateString()}\n`;
+    });
+  }
+  
   Alert.alert(
-    "Accept Project",
-    `Are you sure you want to accept "${project.title}"?`,
+    "Schedule Conflict",
+    alertMessage,
     [
-      { text: "Cancel", style: "cancel" },
       { 
-        text: "Continue", 
+        text: "Cancel", 
+        style: "cancel" 
+      },
+      {
+        text: "Accept Anyway",
+        style: "destructive",
         onPress: () => {
-          // Prompt for deposit instead of directly accepting
-          console.log('continue pressed');
-          promptForDepositAmount(project);
+          Alert.alert(
+            "Confirm Override",
+            "Are you sure you want to accept this project despite the schedule conflict?",
+            [
+              { text: "No", style: "cancel" },
+              { 
+                text: "Yes, Accept", 
+                onPress: () => promptForDepositAmount(project),
+                style: "destructive" 
+              }
+            ]
+          );
+        }
+      },
+      {
+        text: "Negotiate Date",
+        onPress: () => {
+          navigation.navigate('ProjectOffer', { 
+            projectId: project.id,
+            project: project,
+            mode: 'negotiate_schedule',
+            viewMode: 'handyman',
+            suggestedDates: alternatives
+          });
         }
       }
     ]
   );
-
 };
 
 // ADD this new function to HandymanHomeScreen.js
@@ -174,15 +259,23 @@ const acceptJobWithDeposit = async (project, depositAmount) => {
   setJobProcessing(project.id, true);
   
   try {
-    // Update project with complete acceptance data including deposit
+    const projectStartDate = new Date(project.preferredDate);
+    const estimatedDurationHours = 4; // Default 4 hours duration
+    const projectEndDate = new Date(projectStartDate.getTime() + estimatedDurationHours * 60 * 60 * 1000);
+    
+    // Update project with complete acceptance data including schedule
     await projectService.updateProject(project.id, {
-      status: 'awaiting_payment', // Changed from 'accepted' to 'awaiting_payment'
+      status: 'awaiting_payment',
       handymanId: user.id,
       handymanName: user.name,
       handymanAvatar: user.profilePicture,
       depositAmount: depositAmount,
       depositRequested: true,
-      acceptedAt: new Date().toISOString()
+      acceptedAt: new Date().toISOString(),
+      // Add schedule information
+      scheduledStartDate: firebase.firestore.Timestamp.fromDate(projectStartDate),
+      scheduledEndDate: firebase.firestore.Timestamp.fromDate(projectEndDate),
+      estimatedDurationHours: estimatedDurationHours
     });
   
     // Remove from available jobs list

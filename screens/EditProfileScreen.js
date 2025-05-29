@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/userService';
 import { getUserAvatarUri } from '../utils/imageUtils';
 import Colors from '../constants/Colors';
+import { storage } from '../firebase';
 
 const EditProfileScreen = ({ navigation }) => {
   const { user, isHandyman, updateUserProfile } = useAuth();
@@ -109,39 +110,78 @@ const EditProfileScreen = ({ navigation }) => {
   };
 
   // FIXED: Image upload with proper Firebase Storage handling
-  const uploadImageToFirebase = async (imageUri) => {
-    try {
-      setIsUploadingImage(true);
-      
-      // Import storage from your firebase config
-      const { storage } = require('../firebase');
-      
-      // Convert image to blob
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      
-      // Create unique filename with user ID and timestamp
-      const fileName = `profile_pictures/${user.id}_${Date.now()}.jpg`;
-      const ref = storage.ref().child(fileName);
-      
-      // Upload image to Firebase Storage
-      console.log('📤 Uploading image to Firebase Storage...');
-      await ref.put(blob);
-      
-      // Get the download URL
-      console.log('🔗 Getting download URL...');
-      const downloadURL = await ref.getDownloadURL();
-      
-      console.log('✅ Image uploaded successfully:', downloadURL);
-      return downloadURL;
-      
-    } catch (error) {
-      console.error('❌ Error uploading image:', error);
-      throw new Error('Failed to upload image to storage');
-    } finally {
-      setIsUploadingImage(false);
+ const uploadImageToFirebase = async (imageUri) => {
+  try {
+    setIsUploadingImage(true);
+    console.log('🔄 Starting image upload process...');
+    
+    // Validate storage is available
+    if (!storage) {
+      console.error('❌ Firebase storage is not initialized');
+      throw new Error('Storage service is not available');
     }
-  };
+    
+    console.log('✅ Storage service is available');
+    
+    // Convert image to blob
+    console.log('📁 Converting image to blob...');
+    const response = await fetch(imageUri);
+    if (!response.ok) {
+      throw new Error('Failed to fetch image');
+    }
+    const blob = await response.blob();
+    console.log('✅ Image converted to blob, size:', blob.size);
+    
+    // Create unique filename with user ID and timestamp
+    const fileName = `profile_pictures/${user.id}_${Date.now()}.jpg`;
+    console.log('📂 Creating storage reference:', fileName);
+    
+    // Get storage reference
+    const storageRef = storage.ref();
+    const imageRef = storageRef.child(fileName);
+    
+    console.log('📤 Starting upload to Firebase Storage...');
+    
+    // Upload the blob
+    const uploadTask = imageRef.put(blob);
+    
+    // Wait for upload to complete
+    await uploadTask;
+    console.log('✅ Upload completed successfully');
+    
+    // Get the download URL
+    console.log('🔗 Getting download URL...');
+    const downloadURL = await imageRef.getDownloadURL();
+    
+    console.log('✅ Image uploaded successfully:', downloadURL);
+    return downloadURL;
+    
+  } catch (error) {
+    console.error('❌ Error uploading image:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+    
+    // More specific error handling
+    if (error.code === 'storage/unauthorized') {
+      throw new Error('Upload permission denied. Please check your account permissions.');
+    } else if (error.code === 'storage/canceled') {
+      throw new Error('Upload was canceled.');
+    } else if (error.code === 'storage/unknown') {
+      throw new Error('Unknown upload error occurred.');
+    } else if (error.message?.includes('storage is not available')) {
+      throw new Error('Storage service is not properly configured.');
+    } else if (error.message?.includes('ref')) {
+      throw new Error('Storage reference error. Please restart the app and try again.');
+    } else {
+      throw new Error(`Failed to upload image: ${error.message}`);
+    }
+  } finally {
+    setIsUploadingImage(false);
+  }
+};
 
   const handleSelectImage = () => {
     Alert.alert(

@@ -97,6 +97,7 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
   };
 
   const handleResendEmail = async () => {
+    
     if (countdown > 0) return;
     await handleForgotPassword();
   };

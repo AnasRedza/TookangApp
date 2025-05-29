@@ -28,6 +28,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
 import firebase from '../firebase';
+import { storage } from '../firebase';
 
 // Custom color theme as provided
 const Colors = {
@@ -404,18 +405,68 @@ const pickImage = async () => {
     }
 
     setIsLoading(true);
+    setIsLoading(true);
+
+// Add these debug logs:
+console.log('=== FORM SUBMISSION DEBUG ===');
+console.log('Form data images:', formData.images);
+console.log('Images length:', formData.images.length);
+console.log('User ID:', user.id);
+console.log('Storage available:', !!storage);
     
-    try {
-      // Create project data
-      const projectData = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        category: formData.category,
-        location: formData.location.trim(),
-        preferredDate: firebase.firestore.Timestamp.fromDate(formData.preferredDate),
-        preferredTime: firebase.firestore.Timestamp.fromDate(formData.preferredTime),
-        notes: formData.notes.trim(),
-        images: formData.images, // In production, you'd upload these to storage first
+try {
+  // Validation passed, now upload images
+  console.log('Starting image upload process...');
+  
+  let uploadedImages = [];
+  if (formData.images && formData.images.length > 0) {
+    console.log('Found', formData.images.length, 'images to upload');
+    
+    uploadedImages = await Promise.all(
+      formData.images.map(async (imageUri, index) => {
+        console.log(`Processing image ${index + 1}:`, imageUri);
+        
+        if (!imageUri || typeof imageUri !== 'string') {
+          console.log(`Skipping invalid image ${index + 1}`);
+          return null;
+        }
+        
+        try {
+          console.log(`Uploading image ${index + 1}...`);
+          const response = await fetch(imageUri);
+          const blob = await response.blob();
+          
+          const fileName = `project_images/${user.id}_${Date.now()}_${index}.jpg`;
+          const ref = storage.ref().child(fileName);
+          
+          await ref.put(blob);
+          const downloadURL = await ref.getDownloadURL();
+          
+          console.log(`✅ Image ${index + 1} uploaded:`, downloadURL);
+          return downloadURL;
+        } catch (uploadError) {
+          console.error(`❌ Failed to upload image ${index + 1}:`, uploadError);
+          return imageUri;
+        }
+      })
+    );
+    
+    uploadedImages = uploadedImages.filter(url => url !== null);
+    console.log('Final uploaded images:', uploadedImages);
+  } else {
+    console.log('No images to upload');
+  }
+// Create project data
+ console.log('Creating project data...');
+        const projectData = {
+          title: formData.title.trim(),
+          description: formData.description.trim(),
+          category: formData.category,
+          location: formData.location.trim(),
+          preferredDate: firebase.firestore.Timestamp.fromDate(formData.preferredDate),
+          preferredTime: firebase.firestore.Timestamp.fromDate(formData.preferredTime),
+          notes: formData.notes.trim(),
+          images: uploadedImages, // Use uploaded Firebase URLs
         
         // Project metadata
         customerId: user.id,
@@ -438,6 +489,8 @@ const pickImage = async () => {
         review: null,
 
       };
+
+       console.log('Project data created:', projectData);
 
       // Create the project in Firestore
       const docRef = await db.collection('projects').add(projectData);

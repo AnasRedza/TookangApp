@@ -48,6 +48,7 @@ import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
 
 // Additional Screens
+import ScheduleManagementScreen from '../screens/ScheduleManagementScreen';
 import HelpScreen from '../screens/HelpScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import AboutScreen from '../screens/AboutScreen';
@@ -575,8 +576,20 @@ const CustomDrawerContent = (props) => {
       
       {/* Custom drawer items based on user type */}
       {isHandyman ? (
-        // Handyman - Only show specific menu items
+        // Handyman - Show schedule management and earnings
         <View>
+          {/* My Schedule - NEW */}
+          <TouchableOpacity 
+            style={styles.drawerItem}
+            onPress={() => {
+              props.navigation.closeDrawer();
+              props.navigation.navigate('ScheduleManagement');
+            }}
+          >
+            <Ionicons name="calendar" size={24} color="#666" style={styles.drawerItemIcon} />
+            <Text style={styles.drawerItemText}>My Schedule</Text>
+          </TouchableOpacity>
+          
           {/* Earnings */}
           <TouchableOpacity 
             style={styles.drawerItem}
@@ -742,6 +755,20 @@ const MainDrawer = () => {
           )
         }}
       />
+
+      {/* Schedule Management - NEW (only for handymen) */}
+      {isHandyman && (
+        <Drawer.Screen 
+          name="ScheduleManagement" 
+          component={ScheduleManagementScreen} 
+          options={{
+            title: 'My Schedule',
+            drawerIcon: ({ color, size }) => (
+              <Ionicons name="calendar" color={color} size={size} />
+            )
+          }}
+        />
+      )}
       
       {/* Payment Methods */}
       <Drawer.Screen 
