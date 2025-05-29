@@ -347,48 +347,48 @@ const promptForDeposit = () => {
 };
 
 // ADD this new function
-const acceptProjectWithDeposit = async (depositAmount) => {
-  try {
-    // Update project with acceptance and deposit request
-    await projectService.updateProject(project.id, {
-      status: 'accepted',
-      handymanId: user.id,
-      handymanName: user.name,
-      handymanAvatar: user.profilePicture,
-      depositAmount: depositAmount,
-      depositRequested: true,
-      acceptedAt: new Date().toISOString()
-    });
-    
-    setProjectStatus('accepted');
-    setProject(prev => ({
-      ...prev, 
-      status: 'accepted',
-      depositAmount: depositAmount,
-      depositRequested: true
-    }));
-    
-    Alert.alert(
-      "🎉 Project Accepted!",
-      `Great! You've accepted this project and requested a deposit of RM${depositAmount.toFixed(2)}. The customer will be notified and can proceed with payment.`,
-      [
-        {
-          text: "View My Jobs",
-          onPress: () => {
-            navigation.navigate('ProjectsTab', {
-              screen: 'MyProjects'
-            });
-          }
-        },
-        { text: "Continue", style: "cancel" }
-      ]
-    );
-    
-  } catch (error) {
-    console.error('Error accepting project with deposit:', error);
-    Alert.alert("Error", "Failed to accept project. Please try again.");
-  }
-};
+  const acceptProjectWithDeposit = async (depositAmount) => {
+    try {
+      // Update project with acceptance and deposit request
+      await projectService.updateProject(project.id, {
+        status: 'awaiting_payment', // Changed from 'accepted' to 'awaiting_payment'
+        handymanId: user.id,
+        handymanName: user.name,
+        handymanAvatar: user.profilePicture,
+        depositAmount: depositAmount,
+        depositRequested: true,
+        acceptedAt: new Date().toISOString()
+      });
+      
+      setProjectStatus('awaiting_payment');
+      setProject(prev => ({
+        ...prev, 
+        status: 'awaiting_payment',
+        depositAmount: depositAmount,
+        depositRequested: true
+      }));
+      
+      Alert.alert(
+        "🎉 Project Accepted!",
+        `Great! You've accepted this project and requested a deposit of RM${depositAmount.toFixed(2)}. The customer will be notified and can proceed with payment.`,
+        [
+          {
+            text: "View My Jobs",
+            onPress: () => {
+              navigation.navigate('ProjectsTab', {
+                screen: 'MyProjects'
+              });
+            }
+          },
+          { text: "Continue", style: "cancel" }
+        ]
+      );
+      
+    } catch (error) {
+      console.error('Error accepting project with deposit:', error);
+      Alert.alert("Error", "Failed to accept project. Please try again.");
+    }
+  };
   
   const handleOpenNegotiation = async () => {
     return new Promise((resolve) => {
@@ -437,6 +437,21 @@ const acceptProjectWithDeposit = async (depositAmount) => {
       }, 1000);
     });
   };
+
+  const handlePayForProject = async () => {
+  try {
+    navigation.navigate('HomeTab', {
+      screen: 'Payment',
+      params: {
+        project: project,
+        projectDetails: project // For compatibility
+      }
+    });
+  } catch (error) {
+    console.error('Error navigating to payment:', error);
+    Alert.alert('Error', 'Unable to proceed to payment. Please try again.');
+  }
+};
   
   const handleContactUser = () => {
     const otherParty = getOtherParty();
@@ -700,59 +715,74 @@ const acceptProjectWithDeposit = async (depositAmount) => {
         </ScrollView>
         
         {/* Enhanced Action Buttons for Handymen */}
-        {shouldShowActions && (
-          <View style={styles.actionContainer}>
-            <View style={styles.actionButtonsContainer}>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.declineButton]}
-                onPress={() => showActionConfirmation('decline')}
-                disabled={actionLoading !== ''}
-              >
-                {actionLoading === 'decline' ? (
-                  <ActivityIndicator size="small" color="#E53935" />
-                ) : (
-                  <>
-                    <Ionicons name="close-outline" size={20} color="#E53935" />
-                    <Text style={styles.declineButtonText}>Pass</Text>
-                    <Text style={styles.actionSubtext}>Not interested</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.negotiateButton]}
-                onPress={() => showActionConfirmation('negotiate')}
-                disabled={actionLoading !== ''}
-              >
-                {actionLoading === 'negotiate' ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="chatbubbles-outline" size={20} color="#FFFFFF" />
-                    <Text style={styles.negotiateButtonText}>Negotiate</Text>
-                    <Text style={styles.actionSubtext}>Discuss details</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.acceptButton]}
-                onPress={() => showActionConfirmation('accept')}
-                disabled={actionLoading !== ''}
-              >
-                {actionLoading === 'accept' ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="checkmark-outline" size={20} color="#FFFFFF" />
-                    <Text style={styles.acceptButtonText}>Accept</Text>
-                    <Text style={styles.actionSubtext}>Take the job</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
+    {shouldShowActions && (
+  <View style={styles.actionContainer}>
+    <View style={styles.actionButtonsContainer}>
+      <TouchableOpacity 
+        style={[styles.actionButton, styles.declineButton]}
+        onPress={() => showActionConfirmation('decline')}
+        disabled={actionLoading !== ''}
+      >
+        {actionLoading === 'decline' ? (
+          <ActivityIndicator size="small" color="#E53935" />
+        ) : (
+          <>
+            <Ionicons name="close-outline" size={20} color="#E53935" />
+            <Text style={styles.declineButtonText}>Pass</Text>
+            <Text style={styles.actionSubtext}>Not interested</Text>
+          </>
         )}
+      </TouchableOpacity>
+      
+      <TouchableOpacity 
+        style={[styles.actionButton, styles.negotiateButton]}
+        onPress={() => showActionConfirmation('negotiate')}
+        disabled={actionLoading !== ''}
+      >
+        {actionLoading === 'negotiate' ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <>
+            <Ionicons name="chatbubbles-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.negotiateButtonText}>Negotiate</Text>
+            <Text style={styles.actionSubtext}>Discuss details</Text>
+          </>
+        )}
+      </TouchableOpacity>
+      
+      <TouchableOpacity 
+        style={[styles.actionButton, styles.acceptButton]}
+        onPress={() => showActionConfirmation('accept')}
+        disabled={actionLoading !== ''}
+      >
+        {actionLoading === 'accept' ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <>
+            <Ionicons name="checkmark-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.acceptButtonText}>Accept</Text>
+            <Text style={styles.actionSubtext}>Take the job</Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </View>
+  </View>
+)}
+
+{/* Payment Button for Customer */}
+{!isHandyman && project.status === 'awaiting_payment' && (
+  <View style={styles.actionContainer}>
+    <TouchableOpacity 
+      style={styles.paymentButton}
+      onPress={handlePayForProject}
+    >
+      <Ionicons name="card-outline" size={20} color="#FFFFFF" />
+      <Text style={styles.paymentButtonText}>
+        Pay Deposit (RM{project.depositAmount ? project.depositAmount.toFixed(2) : '0.00'})
+      </Text>
+    </TouchableOpacity>
+  </View>
+)}
       </Animated.View>
       
       {/* Action Confirmation Modal */}
@@ -1254,6 +1284,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  paymentButton: {
+  backgroundColor: '#4CAF50',
+  flexDirection: 'row',
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: 16,
+  borderRadius: 12,
+  marginHorizontal: 16,
+  marginBottom: Platform.OS === 'ios' ? 24 : 12,
+  shadowColor: '#4CAF50',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.3,
+  shadowRadius: 4,
+  elevation: 4,
+},
+paymentButtonText: {
+  color: '#FFFFFF',
+  fontSize: 16,
+  fontWeight: 'bold',
+  marginLeft: 8,
+},
 });
 
 export default ProjectDetailScreen;

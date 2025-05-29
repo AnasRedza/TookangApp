@@ -12,10 +12,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { useAuth } from '../context/AuthContext';
+import { projectService } from '../services/projectService';
 
 const PaymentScreen = ({ route, navigation }) => {
   const { projectDetails } = route.params || {};
   const { user } = useAuth();
+   const currentProject = projectDetails || project || {};
   const [selectedMethod, setSelectedMethod] = useState('card');
   const [isProcessing, setIsProcessing] = useState(false);
   const [cardDetails, setCardDetails] = useState([
@@ -23,39 +25,50 @@ const PaymentScreen = ({ route, navigation }) => {
     { id: '2', type: 'mastercard', lastFour: '5555', default: false }
   ]);
   
-  // Calculate total with service fee
-  const amount = projectDetails?.amount || 450;
-  const serviceFee = Math.round(amount * 0.05);
-  const total = amount + serviceFee;
+// Calculate total with service fee - use actual deposit amount
+const depositAmount = currentProject?.depositAmount || 0;
+const serviceFee = Math.round(depositAmount * 0.05);
+const total = depositAmount + serviceFee;
 
   // Mock payment processing
-  const processPayment = () => {
-    setIsProcessing(true);
-    
-    // Simulate network request
-    setTimeout(() => {
+// Direct payment processing (no gateway)
+const processPayment = () => {
+  setIsProcessing(true);
+  
+  // Simulate payment processing
+  setTimeout(async () => {
+    try {
+      // Update project status to in_progress after payment
+      await projectService.updateProjectStatus(currentProject.id, 'in_progress', {
+        depositPaidAt: new Date().toISOString(),
+        depositPaidAmount: total,
+        paymentMethod: 'direct_transfer'
+      });
       setIsProcessing(false);
       
-      // Generate a mock transaction for history
-      const newTransaction = {
+      // Generate transaction record
+      const transaction = {
         id: Math.random().toString(36).substr(2, 9),
         date: new Date().toISOString(),
         amount: total,
-        description: projectDetails?.title || 'Home Repair Service',
+       description: `Deposit for ${currentProject.title}`,
         status: 'completed',
-        paymentMethod: selectedMethod
+        paymentMethod: 'direct_transfer',
+        projectId: projectDetails.id
       };
-      
-      // Save to local storage or context
-      saveTransaction(newTransaction);
       
       // Navigate to success screen
       navigation.navigate('PaymentSuccess', { 
-        transaction: newTransaction,
-        projectDetails
+        transaction: transaction,
+        projectDetails: currentProject
       });
-    }, 2000);
-  };
+    } catch (error) {
+      console.error('Error updating project after payment:', error);
+      setIsProcessing(false);
+      Alert.alert('Error', 'Payment processed but failed to update project status.');
+    }
+  }, 2000);
+};
   
   // Save transaction to mock storage
   const saveTransaction = (transaction) => {
@@ -99,25 +112,25 @@ const PaymentScreen = ({ route, navigation }) => {
         <Text style={styles.summaryTitle}>Payment Summary</Text>
         
         <View style={styles.projectSummary}>
-          <Text style={styles.projectName}>{projectDetails?.title || 'Home Repair Service'}</Text>
-          <Text style={styles.projectProvider}>{projectDetails?.handyman?.name || 'TooKang Handyman'}</Text>
+        <Text style={styles.projectName}>{currentProject?.title || 'Deposit Payment'}</Text>
+        <Text style={styles.projectProvider}>{currentProject?.handymanName || 'TooKang Handyman'}</Text>
           
           <View style={styles.divider} />
           
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Service Cost</Text>
-            <Text style={styles.priceValue}>RM {amount}</Text>
-          </View>
-          
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Service Fee (5%)</Text>
-            <Text style={styles.priceValue}>RM {serviceFee}</Text>
-          </View>
-          
-          <View style={[styles.priceRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>RM {total}</Text>
-          </View>
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>Deposit Amount</Text>
+          <Text style={styles.priceValue}>RM {depositAmount.toFixed(2)}</Text>
+        </View>
+
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>Service Fee (5%)</Text>
+          <Text style={styles.priceValue}>RM {serviceFee.toFixed(2)}</Text>
+        </View>
+
+        <View style={[styles.priceRow, styles.totalRow]}>
+          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalValue}>RM {total.toFixed(2)}</Text>
+        </View>
         </View>
       </View>
       

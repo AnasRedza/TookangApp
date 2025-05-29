@@ -154,28 +154,25 @@ const MyProjectsScreen = ({ route, navigation }) => {
   };
   
   // Handle pay now button
-  const handlePayForProject = async (project) => {
-    try {
-      // Update project status to indicate payment is being processed
-      await projectService.updateProjectStatus(project.id, 'payment_processing');
-      
-      navigation.dispatch(
-        CommonActions.navigate({
-          name: 'HomeTab',
+const handlePayForProject = async (project) => {
+  try {
+    navigation.dispatch(
+      CommonActions.navigate({
+        name: 'HomeTab',
+        params: {
+          screen: 'Payment',
           params: {
-            screen: 'Payment',
-            params: {
-              project: project,
-              total: parseFloat(project.adjustedBudget || project.agreedBudget || project.initialBudget)
-            }
-          },
-        })
-      );
-    } catch (error) {
-      console.error('Error processing payment:', error);
-      Alert.alert('Error', 'Failed to process payment. Please try again.');
-    }
-  };
+            project: project,
+            projectDetails: project // For compatibility with PaymentScreen
+          }
+        },
+      })
+    );
+  } catch (error) {
+    console.error('Error processing payment:', error);
+    Alert.alert('Error', 'Failed to process payment. Please try again.');
+  }
+};
   
   // Handle view adjustment
   const handleViewAdjustment = (project) => {
@@ -246,6 +243,85 @@ const MyProjectsScreen = ({ route, navigation }) => {
     );
   };
   
+  const handleMarkComplete = async (project) => {
+  Alert.alert(
+    "Mark Project Complete",
+    `Are you sure the work for "${project.title}" is completed?`,
+    [
+      { text: "Not Yet", style: "cancel" },
+      { 
+        text: "Yes, Complete", 
+        onPress: async () => {
+          try {
+            await projectService.updateProjectStatus(project.id, 'pending_completion', {
+              markedCompleteAt: new Date().toISOString(),
+              markedCompleteBy: user.id
+            });
+            
+            Alert.alert(
+              "Work Marked Complete", 
+              "The customer will be notified to confirm completion of the work."
+            );
+          } catch (error) {
+            console.error('Error marking project complete:', error);
+            Alert.alert("Error", "Failed to update project status. Please try again.");
+          }
+        }
+      }
+    ]
+  );
+};
+
+const handleConfirmCompletion = async (project) => {
+  Alert.alert(
+    "Confirm Work Completion",
+    `Are you satisfied with the work completed for "${project.title}"?`,
+    [
+      { text: "Not Yet", style: "cancel" },
+      { 
+        text: "Yes, Confirmed", 
+        onPress: async () => {
+          try {
+            await projectService.updateProjectStatus(project.id, 'completed', {
+              completedAt: new Date().toISOString(),
+              confirmedBy: user.id
+            });
+            
+            Alert.alert(
+              "Project Completed!", 
+              "The project has been marked as completed. You can now leave a review for the handyman."
+            );
+          } catch (error) {
+            console.error('Error confirming completion:', error);
+            Alert.alert("Error", "Failed to confirm completion. Please try again.");
+          }
+        }
+      }
+    ]
+  );
+};
+
+const handleLeaveReview = (project) => {
+  const userToReview = isHandyman ? 'customer' : 'handyman';
+  
+  navigation.navigate('ReviewScreen', {
+    project: project,
+    userToReview: project[userToReview] || {
+      name: isHandyman ? project.customerName : project.handymanName,
+      avatar: isHandyman ? project.customerAvatar : project.handymanAvatar,
+      id: isHandyman ? project.customerId : project.handymanId
+    },
+    userType: userToReview,
+    onReviewSubmitted: (reviewData) => {
+      // Mark that review has been submitted for this project
+      projectService.updateProject(project.id, {
+        [`${user.role}ReviewSubmitted`]: true,
+        [`${user.role}ReviewData`]: reviewData
+      });
+    }
+  });
+};
+
   // Format date
   const formatDate = (dateString) => {
     if (!dateString) return 'Not specified';
@@ -255,58 +331,64 @@ const MyProjectsScreen = ({ route, navigation }) => {
   
   // Get status label
   const getStatusLabel = (status) => {
-    if (isHandyman) {
-      switch(status) {
-        case 'open': return 'Available Job';
-        case 'pending_handyman_review': return 'New Job Request';
-        case 'in_negotiation': return 'In Discussion';
-        case 'agreed_scheduled': return 'Job Scheduled';
-        case 'requires_adjustment': return 'Budget Adjustment Sent';
-        case 'requires_payment': return 'Awaiting Payment';
-        case 'payment_processing': return 'Payment Processing';
-        case 'in_progress': return 'In Progress';
-        case 'completed': return 'Completed';
-        case 'cancelled': return 'Cancelled';
-        case 'disputed': return 'Disputed';
-        case 'declined': return isHandyman ? 'Declined Job' : 'Declined by Handyman';
-        default: return status;
-      }
-    } else {
-      switch(status) {
-        case 'open': return 'Open Project';
-        case 'pending_handyman_review': return 'Pending Review';
-        case 'in_negotiation': return 'In Negotiation';
-        case 'agreed_scheduled': return 'Agreed & Scheduled';
-        case 'requires_adjustment': return 'Adjustment Needed';
-        case 'requires_payment': return 'Payment Required';
-        case 'payment_processing': return 'Payment Processing';
-        case 'in_progress': return 'In Progress';
-        case 'completed': return 'Completed';
-        case 'cancelled': return 'Cancelled';
-        case 'disputed': return 'Disputed';
-        case 'declined': return isHandyman ? 'Declined Job' : 'Declined by Handyman';
-        default: return status;
-      }
+  if (isHandyman) {
+    switch(status) {
+      case 'open': return 'Available Job';
+      case 'pending_handyman_review': return 'New Job Request';
+      case 'in_negotiation': return 'In Discussion';
+      case 'agreed_scheduled': return 'Job Scheduled';
+      case 'awaiting_payment': return 'Awaiting Payment';
+      case 'requires_adjustment': return 'Budget Adjustment Sent';
+      case 'requires_payment': return 'Awaiting Payment';
+      case 'payment_processing': return 'Payment Processing';
+      case 'in_progress': return 'Work In Progress';
+      case 'pending_completion': return 'Ready to Complete';
+      case 'completed': return 'Completed';
+      case 'cancelled': return 'Cancelled';
+      case 'disputed': return 'Disputed';
+      case 'declined': return 'Declined Job';
+      default: return status;
     }
-  };
+  } else {
+    switch(status) {
+      case 'open': return 'Open Project';
+      case 'pending_handyman_review': return 'Pending Review';
+      case 'in_negotiation': return 'In Negotiation';
+      case 'agreed_scheduled': return 'Agreed & Scheduled';
+      case 'awaiting_payment': return 'Payment Required';
+      case 'requires_adjustment': return 'Adjustment Needed';
+      case 'requires_payment': return 'Payment Required';
+      case 'payment_processing': return 'Payment Processing';
+      case 'in_progress': return 'Work In Progress';
+      case 'pending_completion': return 'Awaiting Completion';
+      case 'completed': return 'Completed';
+      case 'cancelled': return 'Cancelled';
+      case 'disputed': return 'Disputed';
+      case 'declined': return 'Declined by Handyman';
+      default: return status;
+    }
+  }
+};
   
   // Get status color
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'open': return '#2196F3';
-      case 'pending_handyman_review': return '#FFA000';
-      case 'in_negotiation': return '#2196F3';
-      case 'agreed_scheduled': return '#8BC34A';
-      case 'requires_adjustment': return '#FF5722';
-      case 'requires_payment': return '#E91E63';
-      case 'payment_processing': return '#9C27B0';
-      case 'in_progress': return '#03A9F4';
-      case 'completed': return '#4CAF50';
-      case 'cancelled': return '#F44336';
-      case 'disputed': return '#E91E63';
-      default: return '#9E9E9E';
-    }
-  };
+const getStatusColor = (status) => {
+  switch(status) {
+    case 'open': return '#2196F3';
+    case 'pending_handyman_review': return '#FFA000';
+    case 'in_negotiation': return '#2196F3';
+    case 'agreed_scheduled': return '#8BC34A';
+    case 'awaiting_payment': return '#E91E63';
+    case 'requires_adjustment': return '#FF5722';
+    case 'requires_payment': return '#E91E63';
+    case 'payment_processing': return '#9C27B0';
+    case 'in_progress': return '#03A9F4';
+    case 'pending_completion': return '#FF9800';
+    case 'completed': return '#4CAF50';
+    case 'cancelled': return '#F44336';
+    case 'disputed': return '#E91E63';
+    default: return '#9E9E9E';
+  }
+};
   
   // Render project item
   const renderProjectItem = ({ item }) => {
@@ -390,43 +472,74 @@ const MyProjectsScreen = ({ route, navigation }) => {
           </View>
           
           {/* Action buttons */}
-          <View style={styles.actions}>
-            {!isHandyman && item.status === 'requires_payment' && (
-              <TouchableOpacity 
-                style={styles.payButton}
-                onPress={() => handlePayForProject(item)}
-              >
-                <Text style={styles.payButtonText}>Pay Now</Text>
-              </TouchableOpacity>
-            )}
-            
-            {!isHandyman && item.status === 'requires_adjustment' && (
-              <TouchableOpacity 
-                style={styles.viewButton}
-                onPress={() => handleViewAdjustment(item)}
-              >
-                <Text style={styles.viewButtonText}>View Adjustment</Text>
-              </TouchableOpacity>
-            )}
-            
-            {isHandyman && item.status === 'in_progress' && (
-              <TouchableOpacity 
-                style={styles.completeButton}
-                onPress={() => handleCompleteProject(item)}
-              >
-                <Text style={styles.completeButtonText}>Complete</Text>
-              </TouchableOpacity>
-            )}
-            
-            {(item.status === 'open' || item.status === 'pending_handyman_review') && (
-              <TouchableOpacity 
-                style={styles.cancelButton}
-                onPress={() => handleCancelProject(item)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+      <View style={styles.actions}>
+        {/* Customer can pay when status is awaiting_payment */}
+        {!isHandyman && item.status === 'awaiting_payment' && (
+          <TouchableOpacity 
+            style={styles.payButton}
+            onPress={() => handlePayForProject(item)}
+          >
+            <Text style={styles.payButtonText}>Pay Deposit (RM{item.depositAmount})</Text>
+          </TouchableOpacity>
+        )}
+        
+        {!isHandyman && item.status === 'requires_payment' && (
+          <TouchableOpacity 
+            style={styles.payButton}
+            onPress={() => handlePayForProject(item)}
+          >
+            <Text style={styles.payButtonText}>Pay Now</Text>
+          </TouchableOpacity>
+        )}
+        
+        {!isHandyman && item.status === 'requires_adjustment' && (
+          <TouchableOpacity 
+            style={styles.viewButton}
+            onPress={() => handleViewAdjustment(item)}
+          >
+            <Text style={styles.viewButtonText}>View Adjustment</Text>
+          </TouchableOpacity>
+        )}
+        
+        {/* Handyman can mark as complete when in_progress */}
+        {isHandyman && item.status === 'in_progress' && (
+          <TouchableOpacity 
+            style={styles.completeButton}
+            onPress={() => handleMarkComplete(item)}
+          >
+            <Text style={styles.completeButtonText}>Mark Complete</Text>
+          </TouchableOpacity>
+        )}
+        
+        {/* Customer can confirm completion when pending_completion */}
+        {!isHandyman && item.status === 'pending_completion' && (
+          <TouchableOpacity 
+            style={styles.confirmButton}
+            onPress={() => handleConfirmCompletion(item)}
+          >
+            <Text style={styles.confirmButtonText}>Confirm Completion</Text>
+          </TouchableOpacity>
+        )}
+        
+        {/* Both can leave reviews when completed */}
+        {item.status === 'completed' && !item.reviewSubmitted && (
+          <TouchableOpacity 
+            style={styles.reviewButton}
+            onPress={() => handleLeaveReview(item)}
+          >
+            <Text style={styles.reviewButtonText}>Leave Review</Text>
+          </TouchableOpacity>
+        )}
+        
+        {(item.status === 'open' || item.status === 'pending_handyman_review') && (
+          <TouchableOpacity 
+            style={styles.cancelButton}
+            onPress={() => handleCancelProject(item)}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        )}
+      </View>
         </View>
       </TouchableOpacity>
     );
@@ -809,6 +922,28 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
+  },
+  confirmButton: {
+  backgroundColor: '#4CAF50',
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  borderRadius: 4,
+  },
+  confirmButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  reviewButton: {
+    backgroundColor: '#FF9800',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  reviewButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   }
 });
 

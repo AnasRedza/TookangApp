@@ -176,7 +176,7 @@ const acceptJobWithDeposit = async (project, depositAmount) => {
   try {
     // Update project with complete acceptance data including deposit
     await projectService.updateProject(project.id, {
-      status: 'accepted',
+      status: 'awaiting_payment', // Changed from 'accepted' to 'awaiting_payment'
       handymanId: user.id,
       handymanName: user.name,
       handymanAvatar: user.profilePicture,

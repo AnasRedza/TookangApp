@@ -304,7 +304,7 @@ const handleDirectAcceptance = async () => {
   try {
     // Update project directly with acceptance and deposit
     await projectService.updateProject(project.id, {
-      status: 'accepted',
+      status: 'awaiting_payment', // Changed from 'accepted' to 'awaiting_payment'
       handymanId: user.id,
       handymanName: user.name,
       handymanAvatar: user.profilePicture,
@@ -321,7 +321,7 @@ const handleDirectAcceptance = async () => {
       
       Alert.alert(
         "✅ Project Accepted!",
-        `You've accepted "${project.title}" and requested a deposit of RM${parseFloat(depositAmount).toFixed(2)}. The customer will be notified.`,
+        `You've accepted "${project.title}" and requested a deposit of RM${parseFloat(depositAmount).toFixed(2)}. The customer will be notified and can proceed with payment.`,
         [
           {
             text: "View My Jobs",

@@ -16,6 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { useAuth } from '../context/AuthContext';
+import { projectService } from '../services/projectService';
 
 const ReviewScreen = ({ route, navigation }) => {
   // Get params passed from MyProjectsScreen
@@ -93,31 +94,47 @@ const ReviewScreen = ({ route, navigation }) => {
   
   // Handle review submission
   const handleSubmitReview = () => {
-    // Validation
-    if (reviewText.trim().length < 5) {
-      Alert.alert(
-        "Review Too Short", 
-        "Please provide more details in your review.",
-        [{ text: "OK" }]
-      );
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    // Create review data
-    const reviewData = {
-      rating,
-      reviewText,
-      selectedTags: tags.filter(tag => tag.selected).map(tag => tag.label),
-      reviewerType: userType === 'customer' ? 'handyman' : 'customer', // Invert to get actual reviewer type
-      revieweeType: userType, // This is already the type being reviewed
-      projectId: project.id,
-      reviewedAt: new Date().toISOString()
-    };
-    
-    // Simulate API call
-    setTimeout(() => {
+  // Validation
+  if (reviewText.trim().length < 5) {
+    Alert.alert(
+      "Review Too Short", 
+      "Please provide more details in your review.",
+      [{ text: "OK" }]
+    );
+    return;
+  }
+  
+  setIsSubmitting(true);
+  
+  // Create review data
+  const reviewData = {
+    rating,
+    reviewText,
+    selectedTags: tags.filter(tag => tag.selected).map(tag => tag.label),
+    reviewerType: user.role, // 'customer' or 'handyman'
+    revieweeType: userType, // The type of user being reviewed
+    reviewerId: user.id,
+    reviewerName: user.name,
+    revieweeId: userToReview.id,
+    revieweeName: userToReview.name,
+    projectId: project.id,
+    projectTitle: project.title,
+    reviewedAt: new Date().toISOString()
+  };
+  
+  // Simulate API call to save review
+  setTimeout(async () => {
+    try {
+      // Update project to mark that this user has submitted a review
+      await projectService.updateProject(project.id, {
+        [`${user.role}ReviewSubmitted`]: true,
+        [`${user.role}ReviewData`]: reviewData,
+        [`lastReviewAt`]: new Date().toISOString()
+      });
+      
+      // In a real app, you would also save the review to a reviews collection
+      // await reviewService.createReview(reviewData);
+      
       setIsSubmitting(false);
       
       if (onReviewSubmitted) {
@@ -126,11 +143,16 @@ const ReviewScreen = ({ route, navigation }) => {
       
       Alert.alert(
         "Review Submitted", 
-        "Thank you for your feedback!",
+        "Thank you for your feedback! Your review helps other users make better decisions.",
         [{ text: "OK", onPress: () => navigation.goBack() }]
       );
-    }, 1000);
-  };
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      setIsSubmitting(false);
+      Alert.alert("Error", "Failed to submit review. Please try again.");
+    }
+  }, 1000);
+};
   
   // Render star rating
   const renderStars = () => {

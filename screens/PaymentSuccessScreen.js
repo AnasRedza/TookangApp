@@ -112,12 +112,18 @@ const PaymentSuccessScreen = ({ route, navigation }) => {
           <Text style={styles.primaryButtonText}>View Project Status</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity 
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate('HomeTab')}
-        >
-          <Text style={styles.secondaryButtonText}>Return to Home</Text>
-        </TouchableOpacity>
+      <TouchableOpacity 
+        style={styles.secondaryButton}
+        onPress={() => {
+          // Reset navigation stack and go to home
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'MainTabs' }]
+          });
+        }}
+      >
+        <Text style={styles.secondaryButtonText}>Return to Home</Text>
+      </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
