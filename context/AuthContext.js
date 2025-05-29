@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth, db } from '../firebase';
 import { userService } from '../services/userService';
 import { getUserAvatarUri } from '../utils/imageUtils';
+import firebase from 'firebase/compat/app';
 
 const AuthContext = createContext();
 
@@ -163,23 +164,60 @@ const register = async (name, email, password, role = 'customer', additionalData
     }
   };
 
-  const forgotPassword = async (email) => {
-    try {
-      await auth.sendPasswordResetEmail(email);
-      return { 
-        success: true, 
-        message: 'Password reset email sent. Please check your inbox.' 
-      };
-    } catch (error) {
-      let errorMessage = 'Failed to send password reset email.';
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = 'No account found with this email address.';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address.';
-      }
-      return { success: false, error: errorMessage };
+ const forgotPassword = async (email) => {
+  try {
+    await auth.sendPasswordResetEmail(email);
+    return { 
+      success: true, 
+      message: 'Password reset email sent. Please check your inbox.' 
+    };
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    let errorMessage = 'Failed to send password reset email.';
+    if (error.code === 'auth/user-not-found') {
+      errorMessage = 'No account found with this email address.';
+    } else if (error.code === 'auth/invalid-email') {
+      errorMessage = 'Invalid email address.';
+    } else if (error.code === 'auth/too-many-requests') {
+      errorMessage = 'Too many password reset attempts. Please try again later.';
+    } else if (error.code === 'auth/network-request-failed') {
+      errorMessage = 'Network error. Please check your connection and try again.';
     }
-  };
+    return { success: false, error: errorMessage };
+  }
+};
+
+const changePassword = async (currentPassword, newPassword) => {
+  try {
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      return { success: false, error: 'No authenticated user found' };
+    }
+
+    // Re-authenticate user
+    const credential = firebase.auth.EmailAuthProvider.credential(
+      user.email,
+      currentPassword
+    );
+    await user.reauthenticateWithCredential(credential);
+    
+    // Update password
+    await user.updatePassword(newPassword);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Change password error:', error);
+    let errorMessage = 'Failed to change password.';
+    if (error.code === 'auth/wrong-password') {
+      errorMessage = 'Current password is incorrect.';
+    } else if (error.code === 'auth/weak-password') {
+      errorMessage = 'New password is too weak.';
+    } else if (error.code === 'auth/requires-recent-login') {
+      errorMessage = 'Please sign out and sign back in before changing your password.';
+    }
+    return { success: false, error: errorMessage };
+  }
+};
 
   // Helper function to update user profile
   const updateUserProfile = async (updates) => {
@@ -207,6 +245,7 @@ const register = async (name, email, password, role = 'customer', additionalData
     logout,
     register,
     forgotPassword,
+    changePassword,
     updateUserProfile,
     isHandyman: user?.role === 'handyman',
     isCustomer: user?.role === 'customer',
