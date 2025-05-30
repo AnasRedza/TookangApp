@@ -52,9 +52,8 @@ const TransactionHistoryScreen = ({ navigation }) => {
     setRefreshing(false);
   };
 
-  const getFilteredTransactions = () => {
-    if (filterType === 'all') return transactions;
-    return transactions.filter(transaction => transaction.type === filterType);
+const getFilteredTransactions = () => {
+    return transactions;
   };
 
   const formatDate = (dateString) => {
@@ -347,12 +346,8 @@ const TransactionHistoryScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Filter Tabs */}
-      <View style={styles.filterContainer}>
-        {renderFilterButton('all', 'All')}
-        {renderFilterButton('deposit_received', isHandyman ? 'Received' : 'Deposits')}
-        {renderFilterButton('deposit_paid', isHandyman ? 'Payouts' : 'Payments')}
-      </View>
+{/* Filter Tabs - Only for handyman */}
+ 
 
       {/* Transaction List */}
       {error ? renderErrorState() : (
@@ -531,11 +526,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
-  modalContent: {
+modalContent: {
     backgroundColor: Colors.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
+    maxHeight: '90%',
+    minHeight: '50%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -550,9 +546,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.textDark,
   },
-  modalBody: {
-    flex: 1,
+modalBody: {
+    flexGrow: 1,
     padding: 20,
+    paddingBottom: 0,
   },
   detailSection: {
     marginBottom: 24,

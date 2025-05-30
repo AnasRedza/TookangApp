@@ -36,6 +36,7 @@ import PaymentScreen from '../screens/PaymentScreen';
 import PaymentSuccessScreen from '../screens/PaymentSuccessScreen';
 import PaymentMethodsScreen from '../screens/PaymentMethodsScreen';
 import TransactionHistoryScreen from '../screens/TransactionHistoryScreen';
+import EarningsScreen from '../screens/EarningsScreen';
 
 // Chat Stack Screens
 import ChatListScreen from '../screens/ChatListScreen';
@@ -443,6 +444,46 @@ const PaymentMethodsStack = () => {
   );
 };
 
+// Earnings Stack Navigator (for handymen)
+const EarningsStack = () => {
+  return (
+    <Stack.Navigator 
+      initialRouteName="Earnings"
+      screenOptions={({ navigation, route }) => ({
+        ...screenOptionsBase,
+        headerLeft: () => (
+          <TouchableOpacity 
+            style={{ marginLeft: 15 }}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        ),
+        headerTitle: () => <LogoTitle />
+      })}
+    >
+      <Stack.Screen 
+        name="Earnings" 
+        component={EarningsScreen}
+        options={{ 
+          title: 'My Earnings',
+          headerStyle: { backgroundColor: Colors.primary },
+          headerTintColor: '#FFFFFF'
+        }}
+      />
+      <Stack.Screen 
+        name="TransactionHistory" 
+        component={TransactionHistoryScreen}
+        options={{ 
+          title: 'Transaction History',
+          headerStyle: { backgroundColor: Colors.primary },
+          headerTintColor: '#FFFFFF'
+        }}
+      />
+    </Stack.Navigator>
+  );
+};
+
 // Transaction History Stack Navigator
 const TransactionHistoryStack = () => {
   return (
@@ -793,7 +834,7 @@ const MainDrawer = () => {
       {/* Earnings - only for handyman but registered for navigation */}
       <Drawer.Screen 
         name="EarningsDrawer" 
-        component={TransactionHistoryStack} 
+        component={EarningsStack} 
         options={{
           title: 'My Earnings',
           drawerIcon: ({ color, size }) => (

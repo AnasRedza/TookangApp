@@ -30,7 +30,7 @@ const EarningsScreen = ({ navigation }) => {
     transactionCount: 0
   });
   const [recentTransactions, setRecentTransactions] = useState([]);
-  const [selectedPeriod, setSelectedPeriod] = useState('week');
+  const [selectedPeriod, setSelectedPeriod] = useState('earnings');
   const [chartData, setChartData] = useState([]);
 
   useEffect(() => {
@@ -76,6 +76,22 @@ const EarningsScreen = ({ navigation }) => {
     } catch (error) {
       console.error('Error generating chart data:', error);
     }
+  };
+
+  const getMonthlyEarnings = () => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    return recentTransactions
+      .filter(t => t.type === 'deposit_received' && new Date(t.createdAt) >= monthStart)
+      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+  };
+
+  const getWeeklyEarnings = () => {
+    const now = new Date();
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return recentTransactions
+      .filter(t => t.type === 'deposit_received' && new Date(t.createdAt) >= weekStart)
+      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
   };
 
   const generatePeriodData = (transactions, period) => {
@@ -146,31 +162,12 @@ const EarningsScreen = ({ navigation }) => {
   };
 
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && selectedPeriod === 'transactions') {
       generateChartData();
     }
   }, [selectedPeriod, isLoading]);
 
-  const handleWithdraw = () => {
-    if (earnings.availableBalance <= 0) {
-      Alert.alert('No Balance', 'You have no available balance to withdraw.');
-      return;
-    }
-    
-    Alert.alert(
-      'Withdraw Funds',
-      `You have RM ${earnings.availableBalance.toFixed(2)} available. Would you like to proceed with withdrawal?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Withdraw', 
-          onPress: () => navigation.navigate('Withdrawal', { 
-            availableBalance: earnings.availableBalance 
-          })
-        }
-      ]
-    );
-  };
+ 
 
   const formatDate = (dateString) => {
     const options = { month: 'short', day: 'numeric' };
@@ -283,28 +280,6 @@ const EarningsScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Balance Cards */}
-        <View style={styles.balanceCards}>
-          <View style={styles.balanceCard}>
-            <Text style={styles.balanceTitle}>Available Balance</Text>
-            <Text style={styles.balanceAmount}>RM {earnings.availableBalance.toFixed(2)}</Text>
-            <TouchableOpacity 
-              style={[
-                styles.withdrawButton,
-                earnings.availableBalance <= 0 && styles.disabledButton
-              ]}
-              onPress={handleWithdraw}
-              disabled={earnings.availableBalance <= 0}
-            >
-              <Text style={styles.withdrawButtonText}>Withdraw</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.balanceCard}>
-            <Text style={styles.balanceTitle}>Total Payouts</Text>
-            <Text style={styles.balanceAmount}>RM {earnings.totalPayouts.toFixed(2)}</Text>
-            <Text style={styles.pendingNote}>Withdrawn to bank</Text>
-          </View>
-        </View>
         
         {/* Total Earnings */}
         <View style={styles.totalEarningsContainer}>
@@ -317,53 +292,49 @@ const EarningsScreen = ({ navigation }) => {
           </Text>
         </View>
         
-        {/* Earnings Chart */}
-        <View style={styles.chartSection}>
-          <View style={styles.chartHeader}>
-            <Text style={styles.sectionTitle}>Earnings History</Text>
-            <View style={styles.periodSelector}>
-              <TouchableOpacity
-                style={[
-                  styles.periodButton,
-                  selectedPeriod === 'week' && styles.activePeriodButton
-                ]}
-                onPress={() => setSelectedPeriod('week')}
-              >
-                <Text style={[
-                  styles.periodButtonText,
-                  selectedPeriod === 'week' && styles.activePeriodText
-                ]}>Week</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.periodButton,
-                  selectedPeriod === 'month' && styles.activePeriodButton
-                ]}
-                onPress={() => setSelectedPeriod('month')}
-              >
-                <Text style={[
-                  styles.periodButtonText,
-                  selectedPeriod === 'month' && styles.activePeriodText
-                ]}>Month</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[
-                  styles.periodButton,
-                  selectedPeriod === 'year' && styles.activePeriodButton
-                ]}
-                onPress={() => setSelectedPeriod('year')}
-              >
-                <Text style={[
-                  styles.periodButtonText,
-                  selectedPeriod === 'year' && styles.activePeriodText
-                ]}>Year</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Quick Stats */}
+        <View style={styles.quickStatsContainer}>
+          <View style={styles.quickStatCard}>
+            <Text style={styles.quickStatLabel}>This Month</Text>
+            <Text style={styles.quickStatAmount}>RM {getMonthlyEarnings().toFixed(2)}</Text>
           </View>
           
-          <SimpleBarChart data={chartData} />
+          <View style={styles.quickStatCard}>
+            <Text style={styles.quickStatLabel}>Last 7 Days</Text>
+            <Text style={styles.quickStatAmount}>RM {getWeeklyEarnings().toFixed(2)}</Text>
+          </View>
+        </View>
+
+        {/* Earnings Chart */}
+        <View style={styles.chartSection}>
+        
+            <View style={styles.periodSelector}>
+          </View>
+      
+          
+          {selectedPeriod === 'earnings' ? (
+            <View style={styles.earningsOverview}>
+              <Text style={styles.overviewTitle}>Earnings Breakdown</Text>
+              <View style={styles.earningsBreakdown}>
+                <View style={styles.breakdownItem}>
+                  <Text style={styles.breakdownLabel}>Total Jobs</Text>
+                  <Text style={styles.breakdownValue}>{earnings.transactionCount}</Text>
+                </View>
+                <View style={styles.breakdownItem}>
+                  <Text style={styles.breakdownLabel}>Average per Job</Text>
+                  <Text style={styles.breakdownValue}>
+                    RM {earnings.transactionCount > 0 ? (earnings.totalEarnings / earnings.transactionCount).toFixed(0) : '0'}
+                  </Text>
+                </View>
+                <View style={styles.breakdownItem}>
+                  <Text style={styles.breakdownLabel}>This Month</Text>
+                  <Text style={styles.breakdownValue}>RM {getMonthlyEarnings().toFixed(2)}</Text>
+                </View>
+              </View>
+            </View>
+          ) : (
+            <SimpleBarChart data={chartData} />
+          )}
         </View>
         
         {/* Recent Transactions */}
@@ -402,20 +373,20 @@ const EarningsScreen = ({ navigation }) => {
           <View style={styles.statsCards}>
             <View style={styles.statsCard}>
               <Ionicons name="star-outline" size={24} color={Colors.primary} />
-              <Text style={styles.statsValue}>4.8</Text>
+              <Text style={styles.statsValue}>{user?.rating?.toFixed(1) || '0.0'}</Text>
               <Text style={styles.statsLabel}>Average Rating</Text>
             </View>
             
             <View style={styles.statsCard}>
               <Ionicons name="people-outline" size={24} color={Colors.primary} />
-              <Text style={styles.statsValue}>{earnings.transactionCount}</Text>
+              <Text style={styles.statsValue}>{user?.completedJobs || earnings.transactionCount}</Text>
               <Text style={styles.statsLabel}>Jobs Completed</Text>
             </View>
             
             <View style={styles.statsCard}>
               <Ionicons name="trending-up-outline" size={24} color={Colors.primary} />
               <Text style={styles.statsValue}>
-                {earnings.transactionCount > 0 ? (earnings.totalEarnings / earnings.transactionCount).toFixed(0) : '0'}
+                RM{earnings.transactionCount > 0 ? (earnings.totalEarnings / earnings.transactionCount).toFixed(0) : '0'}
               </Text>
               <Text style={styles.statsLabel}>Avg per Job</Text>
             </View>
@@ -475,19 +446,9 @@ const styles = StyleSheet.create({
     color: '#333333',
     marginBottom: 16,
   },
-  withdrawButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 6,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
+
   disabledButton: {
     backgroundColor: '#CCCCCC',
-  },
-  withdrawButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
   },
   pendingNote: {
     fontSize: 12,
@@ -719,6 +680,59 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666666',
     textAlign: 'center',
+  },
+  quickStatsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  quickStatCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    width: '48%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  quickStatLabel: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 8,
+  },
+  quickStatAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.primary,
+  },
+  earningsOverview: {
+    paddingVertical: 20,
+  },
+  overviewTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  earningsBreakdown: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  breakdownItem: {
+    alignItems: 'center',
+  },
+  breakdownLabel: {
+    fontSize: 12,
+    color: '#666666',
+    marginBottom: 4,
+  },
+  breakdownValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.primary,
   },
 });
 
