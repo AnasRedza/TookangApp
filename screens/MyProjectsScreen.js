@@ -416,10 +416,10 @@ const getStatusColor = (status) => {
   
   // Render project item
   const renderProjectItem = ({ item }) => {
-    const otherParty = isHandyman ? item.customer : (item.handyman || {
+  const otherParty = isHandyman ? item.customer : (item.handyman || {
   name: item.requestedHandymanName || 'No handyman assigned',
   avatar: getUserAvatarUri({ name: item.requestedHandymanName, profilePicture: item.requestedHandymanAvatar }),
-  rating: 4.5
+  rating: item.requestedHandymanRating || 0
 });
     
     return (

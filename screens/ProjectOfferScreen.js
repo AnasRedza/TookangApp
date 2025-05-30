@@ -52,7 +52,7 @@ const ProjectOfferScreen = ({ route, navigation }) => {
   const [proposedDate, setProposedDate] = useState(null);
   const [proposedTime, setProposedTime] = useState(null);
   const [errors, setErrors] = useState({});
-  const [offerType, setOfferType] = useState('accept');
+  const [offerType, setOfferType] = useState('negotiate');
   
   // Parse the project budget to extract values for initial offer
   useEffect(() => {
@@ -288,6 +288,7 @@ const handleSubmit = async () => {
       // Direct project acceptance with deposit
       await handleDirectAcceptance();
     } else {
+        console.log('🔍 Calling handleStartNegotiation');
       // Just start a conversation for negotiation
       await handleStartNegotiation();
     }
@@ -342,6 +343,10 @@ const handleDirectAcceptance = async () => {
 };
 
   const handleStartNegotiation = async () => {
+
+      console.log('🔍 handleStartNegotiation called');
+  console.log('🔍 project:', project);
+  console.log('🔍 message:', message);
     try {
       // Create or get conversation
       const conversationId = await chatService.createOrGetConversation(
@@ -440,47 +445,16 @@ const handleDirectAcceptance = async () => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollViewContent}
         >
-          {/* Offer Type Selector */}
+         {/* Project Discussion */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>What would you like to do?</Text>
-            <View style={styles.offerTypeContainer}>
-              <TouchableOpacity
-                style={[styles.offerTypeButton, offerType === 'accept' && styles.selectedOfferType]}
-                onPress={() => setOfferType('accept')}
-              >
-                <Ionicons 
-                  name="checkmark-circle" 
-                  size={24} 
-                  color={offerType === 'accept' ? Colors.success : Colors.textLight} 
-                />
-                <Text style={[styles.offerTypeText, offerType === 'accept' && styles.selectedOfferTypeText]}>
-                  Accept as-is
-                </Text>
-                <Text style={styles.offerTypeSubtext}>
-                  Take the job and request deposit
-                </Text>
-              </TouchableOpacity>
-              
-              
-              <TouchableOpacity
-                style={[styles.offerTypeButton, offerType === 'negotiate' && styles.selectedOfferType]}
-                onPress={() => setOfferType('negotiate')}
-              >
-                <Ionicons 
-                  name="chatbubbles" 
-                  size={24} 
-                  color={offerType === 'negotiate' ? Colors.primary : Colors.textLight} 
-                />
-                <Text style={[styles.offerTypeText, offerType === 'negotiate' && styles.selectedOfferTypeText]}>
-                  Start Discussion
-                </Text>
-                <Text style={styles.offerTypeSubtext}>
-                  Chat about details first
-                </Text>
-              </TouchableOpacity>
+            <Text style={styles.cardTitle}>Start Discussion</Text>
+            <View style={styles.discussionInfo}>
+              <Ionicons name="chatbubbles" size={32} color={Colors.primary} />
+              <Text style={styles.discussionText}>
+                You can discuss project details, timeline, and any questions with the customer before proceeding.
+              </Text>
             </View>
           </View>
-          
           {/* Project summary */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Project Summary</Text>
@@ -511,59 +485,6 @@ const handleDirectAcceptance = async () => {
             </View>
           </View>
           
-       {/* Deposit Details - Only show for accept */}
-      {offerType === 'accept' && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Deposit Request</Text>
-    
-          {/* Deposit Input */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Deposit Amount (RM)</Text>
-            <Text style={styles.inputSubLabel}>
-              Request a deposit to secure the job. Additional payments for materials can be handled directly.
-            </Text>
-            <View style={styles.priceInputContainer}>
-              <Text style={styles.currencySymbol}>RM</Text>
-              <TextInput
-                style={[styles.priceInput, errors.depositAmount && styles.inputError]}
-                placeholder="Enter deposit amount"
-                value={depositAmount}
-                onChangeText={setDepositAmount}
-                keyboardType="number-pad"
-                returnKeyType="done"
-              />
-            </View>
-            {errors.depositAmount && (
-              <Text style={styles.errorText}>{errors.depositAmount}</Text>
-            )}
-          </View>
-          
-          {/* Duration */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Estimated Duration</Text>
-            <TextInput
-              style={[styles.input, errors.estimatedDuration && styles.inputError]}
-              placeholder="e.g. 2-3 hours, 1 day"
-              value={estimatedDuration}
-              onChangeText={setEstimatedDuration}
-              returnKeyType="done"
-            />
-            {errors.estimatedDuration && (
-              <Text style={styles.errorText}>{errors.estimatedDuration}</Text>
-            )}
-          </View>
-          
-          {/* Materials Note */}
-          <View style={styles.inputGroup}>
-            <View style={styles.noteBox}>
-              <Ionicons name="information-circle-outline" size={20} color={Colors.info} />
-              <Text style={styles.noteText}>
-                Material or addintional costs will be handled separately when you meet. Only request a deposit for your service.
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
           
           {/* Message Section */}
           <View style={styles.card}>
@@ -648,10 +569,9 @@ const handleDirectAcceptance = async () => {
                 size={18} 
                 color="#FFFFFF" 
               />
-              <Text style={styles.submitButtonText}>
-                {offerType === 'negotiate' ? 'Start Discussion' : 
-                 offerType === 'accept' ? 'Accept Project' : 'Send Counter-Offer'}
-              </Text>
+            <Text style={styles.submitButtonText}>
+            Start Discussion
+          </Text>
             </>
           )}
         </TouchableOpacity>
@@ -1071,7 +991,21 @@ const styles = StyleSheet.create({
   borderRadius: 8,
   padding: 12,
   alignItems: 'flex-start',
-  }
+  },
+  discussionInfo: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: 16,
+  backgroundColor: Colors.highlight,
+  borderRadius: 8,
+},
+discussionText: {
+  flex: 1,
+  marginLeft: 16,
+  fontSize: 15,
+  color: Colors.textDark,
+  lineHeight: 20,
+},
 });
 
 export default ProjectOfferScreen;

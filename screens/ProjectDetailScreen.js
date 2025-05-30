@@ -109,7 +109,7 @@ const ProjectDetailScreen = ({ route, navigation }) => {
         customer: {
           name: rawProject.customerName,
           avatar: getUserAvatarUri({ name: rawProject.customerName, profilePicture: rawProject.customerAvatar }),
-          rating: rawProject.customerRating || 4.5,
+          rating: rawProject.customerRating || 0,
           id: rawProject.customerId || `c${rawProject.id}`
         },
         preferredDate: rawProject.preferredDate || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
@@ -173,14 +173,14 @@ const ProjectDetailScreen = ({ route, navigation }) => {
       name: project.customerName || 'Customer', 
       avatar: getUserAvatarUri({ name: project.customerName, profilePicture: project.customerAvatar }),
       id: project.customerId || 'unknown', 
-      rating: project.customerRating || 4.5 
+      rating: project.customerRating || 0
     };
-    
+
     const defaultHandyman = { 
       name: project.requestedHandymanName || 'Handyman', 
       avatar: getUserAvatarUri({ name: project.requestedHandymanName, profilePicture: project.requestedHandymanAvatar }),
       id: project.requestedHandymanId || 'unknown', 
-      rating: 4.5 
+      rating: project.requestedHandymanRating || 0
     };
 
     const otherParty = isHandyman 
@@ -787,7 +787,7 @@ const shouldShowActions = isHandyman &&
           <>
             <Ionicons name="close-outline" size={20} color="#E53935" />
             <Text style={styles.declineButtonText}>Pass</Text>
-            <Text style={styles.actionSubtext}>Not interested</Text>
+       
           </>
         )}
       </TouchableOpacity>
@@ -803,7 +803,6 @@ const shouldShowActions = isHandyman &&
           <>
             <Ionicons name="chatbubbles-outline" size={20} color="#FFFFFF" />
             <Text style={styles.negotiateButtonText}>Negotiate</Text>
-            <Text style={styles.actionSubtext}>Discuss details</Text>
           </>
         )}
       </TouchableOpacity>
@@ -819,7 +818,6 @@ const shouldShowActions = isHandyman &&
           <>
             <Ionicons name="checkmark-outline" size={20} color="#FFFFFF" />
             <Text style={styles.acceptButtonText}>Accept</Text>
-            <Text style={styles.actionSubtext}>Take the job</Text>
           </>
         )}
       </TouchableOpacity>

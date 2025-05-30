@@ -37,6 +37,8 @@ const HandymanHomeScreen = ({ navigation }) => {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [depositInput, setDepositInput] = useState('');
+  const tabs = ['available', 'negotiation'];
+const [activeTab, setActiveTab] = useState('available');
   
   useEffect(() => {
     loadAvailableJobs();
@@ -57,6 +59,19 @@ const HandymanHomeScreen = ({ navigation }) => {
     return () => unsubscribe && unsubscribe();
   }, []);
     
+const getTabFilteredJobs = () => {
+  if (activeTab === 'available') {
+    return jobs.filter(job => 
+      job.status === 'pending_handyman_review' || 
+      job.status === 'open'
+    );
+  } else {
+    return jobs.filter(job => 
+      job.status === 'in_negotiation'
+    );
+  }
+};
+
 const loadAvailableJobs = async () => {
   try {
     setError(null);
@@ -85,14 +100,14 @@ const loadAvailableJobs = async () => {
                 ...project,
                 customer: customer,
                 customerName: customer?.name || project.customerName || 'Unknown Customer',
-                customerRating: customer?.rating || 4.5,
+                customerRating: customer?.rating || 0,
                 customerAvatar: getUserAvatarUri(customer)
               };
             }
             return {
               ...project,
               customerName: project.customerName || 'Unknown Customer',
-              customerRating: project.customerRating || 4.5,
+              customerRating: project.customerRating || 0,
               customerAvatar: getUserAvatarUri({ name: project.customerName || 'Customer' })
             };
           } catch (error) {
@@ -100,7 +115,7 @@ const loadAvailableJobs = async () => {
             return {
               ...project,
               customerName: project.customerName || 'Unknown Customer',
-              customerRating: 4.5,
+              customerRating: 0,
               customerAvatar: getUserAvatarUri({ name: 'Customer' })
             };
           }
@@ -491,7 +506,7 @@ const handleContactCustomer = (project) => {
               <Text style={styles.customerName}>{item.customerName}</Text>
               <View style={styles.ratingContainer}>
                 <Ionicons name="star" size={12} color="#FFD700" />
-                <Text style={styles.ratingText}>{item.customerRating?.toFixed(1) || '4.5'}</Text>
+                <Text style={styles.ratingText}>{item.customerRating?.toFixed(1) || '0'}</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
@@ -596,6 +611,40 @@ const handleContactCustomer = (project) => {
   
   return (
     <SafeAreaView style={styles.container}>
+
+    {/* Tabs */}
+    <View style={styles.tabsContainer}>
+      <TouchableOpacity
+        style={[
+          styles.tab,
+          activeTab === 'available' && styles.activeTab
+        ]}
+        onPress={() => setActiveTab('available')}
+      >
+        <Text style={[
+          styles.tabText,
+          activeTab === 'available' && styles.activeTabText
+        ]}>
+          Available Jobs
+        </Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity
+        style={[
+          styles.tab,
+          activeTab === 'negotiation' && styles.activeTab
+        ]}
+        onPress={() => setActiveTab('negotiation')}
+      >
+        <Text style={[
+          styles.tabText,
+          activeTab === 'negotiation' && styles.activeTabText
+        ]}>
+          In Discussion
+        </Text>
+      </TouchableOpacity>
+    </View>
+
       {/* Stats Header */}
       <View style={styles.statsHeader}>
         <View style={styles.statItem}>
@@ -609,17 +658,10 @@ const handleContactCustomer = (project) => {
           </Text>
           <Text style={styles.statLabel}>Urgent</Text>
         </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>
-            {jobs.filter(job => job.isNegotiable).length}
-          </Text>
-          <Text style={styles.statLabel}>Negotiable</Text>
-        </View>
       </View>
       
       <FlatList
-        data={jobs}
+        data={getTabFilteredJobs()}
         renderItem={renderJobItem}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.jobsList}
@@ -701,6 +743,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F7FA',
+  },
+   tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.primary,
+  },
+  tabText: {
+    fontSize: 15,
+    color: '#666',
+  },
+  activeTabText: {
+    color: Colors.primary,
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
