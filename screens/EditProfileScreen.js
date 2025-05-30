@@ -21,12 +21,14 @@ import { userService } from '../services/userService';
 import { getUserAvatarUri } from '../utils/imageUtils';
 import Colors from '../constants/Colors';
 import { storage } from '../firebase';
+import * as Location from 'expo-location';
 
 const EditProfileScreen = ({ navigation }) => {
   const { user, isHandyman, updateUserProfile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [userData, setUserData] = useState({
     name: '',
     email: '',
@@ -50,6 +52,19 @@ const EditProfileScreen = ({ navigation }) => {
   useEffect(() => {
     loadUserData();
   }, [user]);
+
+  // Request location permissions
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Permission to access location was denied. Some features may be limited.'
+        );
+      }
+    })();
+  }, []);
   
   const loadUserData = async () => {
     if (!user?.id) return;
@@ -277,6 +292,73 @@ const EditProfileScreen = ({ navigation }) => {
     handleInputChange('profilePicture', generatedAvatar);
   };
 
+  // Get current location
+  const getCurrentLocation = async () => {
+    try {
+      setIsLoadingLocation(true);
+      
+      // Check if permissions are granted
+      let { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        status = (await Location.requestForegroundPermissionsAsync()).status;
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permission Denied',
+            'Location permission is required to use this feature.'
+          );
+          setIsLoadingLocation(false);
+          return;
+        }
+      }
+      
+      // Get current position
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      
+      // Reverse geocode to get address
+      const geocode = await Location.reverseGeocodeAsync({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+      
+      if (geocode.length > 0) {
+        const address = geocode[0];
+        const formattedAddress = formatAddress(address);
+        handleInputChange('location', formattedAddress);
+      } else {
+        Alert.alert(
+          'Location Error',
+          'Could not determine your address. Please enter it manually.'
+        );
+      }
+    } catch (error) {
+      console.error('Error getting location:', error);
+      Alert.alert(
+        'Location Error',
+        'Could not determine your location. Please check your device settings and try again.'
+      );
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  };
+  
+  // Format address from geocode result
+  const formatAddress = (address) => {
+    const components = [];
+    
+    if (address.name) components.push(address.name);
+    if (address.street) components.push(address.street);
+    if (address.district) components.push(address.district);
+    if (address.city) components.push(address.city);
+    if (address.region) components.push(address.region);
+    if (address.postalCode) components.push(address.postalCode);
+    if (address.country) components.push(address.country);
+    
+    return components.join(', ');
+  };
+
+
   const validateForm = () => {
     if (!userData.name.trim()) {
       Alert.alert('Missing Information', 'Please enter your name');
@@ -465,14 +547,27 @@ const EditProfileScreen = ({ navigation }) => {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Professional Details</Text>
               
-              <View style={styles.fieldContainer}>
+             <View style={styles.fieldContainer}>
                 <Text style={styles.fieldLabel}>Service Location</Text>
-                <TextInput
-                  style={styles.input}
-                  value={userData.location}
-                  onChangeText={(text) => handleInputChange('location', text)}
-                  placeholder="Enter your service area"
-                />
+                <View style={styles.locationInputContainer}>
+                  <TextInput
+                    style={[styles.input, styles.locationInput]}
+                    value={userData.location}
+                    onChangeText={(text) => handleInputChange('location', text)}
+                    placeholder="Enter your service area"
+                  />
+                  <TouchableOpacity 
+                    style={styles.locationButton}
+                    onPress={getCurrentLocation}
+                    disabled={isLoadingLocation}
+                  >
+                    {isLoadingLocation ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Ionicons name="navigate" size={22} color="#FFFFFF" />
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
               
               <View style={styles.fieldContainer}>
@@ -826,6 +921,24 @@ addServiceText: {
   fontSize: 14,
   fontWeight: '600',
 },
+locationInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  locationInput: {
+    flex: 1,
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  locationButton: {
+    backgroundColor: Colors.primary,
+    height: 48,
+    width: 48,
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  }
 });
 
 export default EditProfileScreen;

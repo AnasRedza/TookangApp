@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import Colors from '../constants/Colors';
+import * as Location from 'expo-location';
+
 
 const RegisterScreen = ({ navigation }) => {
-  const { register } = useAuth();
+  const { register, login } = useAuth();
   const [step, setStep] = useState(1); // Multi-step registration
   
   // Basic info (Step 1)
@@ -27,6 +29,7 @@ const RegisterScreen = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [userType, setUserType] = useState('customer');
   const [phone, setPhone] = useState('');
+
   
   // Handyman additional info (Step 2 - only for handymen)
   const [bio, setBio] = useState('');
@@ -34,6 +37,78 @@ const RegisterScreen = ({ navigation }) => {
   const [location, setLocation] = useState('');
   const [serviceCategories, setServiceCategories] = useState([]);
   const [hourlyRate, setHourlyRate] = useState('');
+  const [errors, setErrors] = useState({});
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+
+
+
+  useEffect(() => {
+  (async () => {
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Denied',
+        'Permission to access location was denied. Some features may be limited.'
+      );
+    }
+  })();
+}, []);
+
+  // Location permissions useEffect (just added above)
+
+// ADD THESE FUNCTIONS HERE:
+// Get current location
+const getCurrentLocation = async () => {
+  try {
+    setIsLoadingLocation(true);
+    
+    let { status } = await Location.getForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      status = (await Location.requestForegroundPermissionsAsync()).status;
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required.');
+        setIsLoadingLocation(false);
+        return;
+      }
+    }
+    
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    
+    const geocode = await Location.reverseGeocodeAsync({
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+    });
+    
+    if (geocode.length > 0) {
+      const address = geocode[0];
+      const formattedAddress = formatAddress(address);
+      setLocation(formattedAddress);
+    } else {
+      Alert.alert('Location Error', 'Could not determine your address. Please enter it manually.');
+    }
+  } catch (error) {
+    console.error('Error getting location:', error);
+    Alert.alert('Location Error', 'Could not determine your location. Please check your device settings and try again.');
+  } finally {
+    setIsLoadingLocation(false);
+  }
+};
+
+// Format address from geocode result
+const formatAddress = (address) => {
+  const components = [];
+  if (address.name) components.push(address.name);
+  if (address.street) components.push(address.street);
+  if (address.district) components.push(address.district);
+  if (address.city) components.push(address.city);
+  if (address.region) components.push(address.region);
+  if (address.postalCode) components.push(address.postalCode);
+  if (address.country) components.push(address.country);
+  return components.join(', ');
+};
+
   
   // Service categories options
   const AVAILABLE_CATEGORIES = [
@@ -199,17 +274,31 @@ const RegisterScreen = ({ navigation }) => {
         userData.profilePicture = `https://ui-avatars.com/api/?name=${encodeURIComponent(name.trim())}&background=random`;
       }
 
-      const result = await register(userData.name, userData.email, password, userData.role, userData);
-      
-      if (!result.success) {
-        Alert.alert('Registration Failed', result.error || 'Please try again');
-      } else {
-        Alert.alert(
-          'Registration Successful',
-          `Welcome to TooKang! Your ${userType} account has been created successfully.`,
-          [{ text: 'OK' }]
-        );
-      }
+ const result = await register(userData.name, userData.email, password, userData.role, userData);
+
+if (!result.success) {
+  Alert.alert('Registration Failed', result.error || 'Please try again');
+} else {
+  // After successful registration, log the user in
+  const loginResult = await login(userData.email, password, userData.role);
+  
+  if (loginResult.success) {
+    Alert.alert(
+      'Welcome to TooKang!',
+      `Your ${userType} account has been created successfully. You're now logged in!`,
+      [{ text: 'Get Started' }]
+    );
+  } else {
+    Alert.alert(
+      'Registration Successful',
+      'Your account has been created. Please log in.',
+      [{ 
+        text: 'Go to Login', 
+        onPress: () => navigation.navigate('Login')
+      }]
+    );
+  }
+}
     } catch (error) {
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
       console.error('Registration error:', error);
@@ -378,16 +467,35 @@ const RegisterScreen = ({ navigation }) => {
         Tell us about your services to help customers find you
       </Text>
       
-      <View style={styles.inputContainer}>
-        <Ionicons name="location-outline" size={20} color="#999" style={styles.inputIcon} />
-        <TextInput
-          style={styles.input}
-          placeholder="Service Location (e.g., Kuala Lumpur)"
-          value={location}
-          onChangeText={setLocation}
-          autoCapitalize="words"
-        />
-      </View>
+<View style={styles.questionContainer}>
+  <View style={styles.questionLabelContainer}>
+    <Text style={styles.questionLabel}>
+      Service Location <Text style={styles.requiredAsterisk}>*</Text>
+    </Text>
+  </View>
+</View><View style={styles.inputContainer}>
+  <Ionicons name="location-outline" size={20} color="#999" style={styles.inputIcon} />
+  <View style={styles.locationInputContainer}>
+    <TextInput
+      style={[styles.input, styles.locationInput]}
+      placeholder="Service Location (e.g., Kuala Lumpur)"
+      value={location}
+      onChangeText={setLocation}
+      autoCapitalize="words"
+    />
+    <TouchableOpacity 
+      style={styles.locationButton}
+      onPress={getCurrentLocation}
+      disabled={isLoadingLocation}
+    >
+      {isLoadingLocation ? (
+        <ActivityIndicator size="small" color="#FFFFFF" />
+      ) : (
+        <Ionicons name="navigate" size={22} color="#FFFFFF" />
+      )}
+    </TouchableOpacity>
+  </View>
+</View>
 
       <View style={styles.inputContainer}>
         <Ionicons name="time-outline" size={20} color="#999" style={styles.inputIcon} />
@@ -739,6 +847,27 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: 16,
   },
+
+  locationInputContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,
+},
+locationInput: {
+  flex: 1,
+  borderTopRightRadius: 0,
+  borderBottomRightRadius: 0,
+},
+locationButton: {
+  backgroundColor: Colors.primary,
+  height: 40,
+  width: 40,
+  borderTopRightRadius: 4,
+  borderBottomRightRadius: 4,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginLeft: -1,
+},
 });
 
 export default RegisterScreen;
