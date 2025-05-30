@@ -461,7 +461,15 @@ const TransactionHistoryStack = () => {
         headerTitle: () => <LogoTitle />
       })}
     >
-      <Stack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
+        <Stack.Screen 
+        name="TransactionHistory" 
+        component={TransactionHistoryScreen}
+        options={{ 
+          title: 'Transaction History',
+          headerStyle: { backgroundColor: Colors.primary },
+          headerTintColor: '#FFFFFF'
+        }}
+      />
     </Stack.Navigator>
   );
 };

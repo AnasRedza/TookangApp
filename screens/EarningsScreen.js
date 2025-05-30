@@ -1,3 +1,4 @@
+// screens/EarningsScreen.js - Updated with Real Transaction Integration
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -8,152 +9,195 @@ import {
   FlatList,
   ActivityIndicator,
   SafeAreaView,
-  Dimensions
+  Dimensions,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
+import { transactionService } from '../services/transactionService';
+import { getUserAvatarUri } from '../utils/imageUtils';
 import Colors from '../constants/Colors';
 
 const screenWidth = Dimensions.get('window').width;
 
 const EarningsScreen = ({ navigation }) => {
-  // States for earnings data
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [earnings, setEarnings] = useState({
     totalEarnings: 0,
     availableBalance: 0,
-    pendingBalance: 0,
-    weeklyData: [],
-    recentTransactions: []
+    totalPayouts: 0,
+    transactionCount: 0
   });
+  const [recentTransactions, setRecentTransactions] = useState([]);
   const [selectedPeriod, setSelectedPeriod] = useState('week');
-  
-  // Mock data - replace with API call in production
+  const [chartData, setChartData] = useState([]);
+
   useEffect(() => {
-    // Simulate API fetch delay
-    const timer = setTimeout(() => {
-      const mockEarnings = {
-        totalEarnings: 1250.00,
-        availableBalance: 785.00,
-        pendingBalance: 350.00,
-        weeklyData: [
-          { label: 'Mon', value: 50 },
-          { label: 'Tue', value: 120 },
-          { label: 'Wed', value: 0 },
-          { label: 'Thu', value: 85 },
-          { label: 'Fri', value: 200 },
-          { label: 'Sat', value: 180 },
-          { label: 'Sun', value: 150 },
-        ],
-        monthlyData: [
-          { label: 'Week 1', value: 350 },
-          { label: 'Week 2', value: 280 },
-          { label: 'Week 3', value: 420 },
-          { label: 'Week 4', value: 200 },
-        ],
-        yearlyData: [
-          { label: 'Jan', value: 800 },
-          { label: 'Feb', value: 1200 },
-          { label: 'Mar', value: 950 },
-          { label: 'Apr', value: 1500 },
-          { label: 'May', value: 1250 },
-          { label: 'Jun', value: 1820 },
-        ],
-        recentTransactions: [
-          {
-            id: '1',
-            type: 'payout',
-            amount: 200,
-            date: '2025-05-10',
-            status: 'completed',
-            project: 'Fix leaking bathroom sink'
-          },
-          {
-            id: '2',
-            type: 'earning',
-            amount: 85,
-            date: '2025-05-05',
-            status: 'pending',
-            project: 'Install ceiling fan'
-          },
-          {
-            id: '3',
-            type: 'payout',
-            amount: 350,
-            date: '2025-04-28',
-            status: 'completed',
-            project: 'Paint living room walls'
-          },
-          {
-            id: '4',
-            type: 'earning',
-            amount: 150,
-            date: '2025-04-25',
-            status: 'pending',
-            project: 'Fix garden irrigation'
-          }
-        ]
-      };
-      
-      setEarnings(mockEarnings);
-      setIsLoading(false);
-    }, 800);
-    
-    return () => clearTimeout(timer);
+    loadEarningsData();
+    loadRecentTransactions();
   }, []);
-  
-  // Handle withdrawal
-  const handleWithdraw = () => {
-    navigation.navigate('Withdrawal', { 
-      availableBalance: earnings.availableBalance 
-    });
+
+  const loadEarningsData = async () => {
+    try {
+      const stats = await transactionService.getUserEarningsStats(user.id);
+      setEarnings(stats);
+      
+      // Generate chart data based on recent transactions
+      await generateChartData();
+    } catch (error) {
+      console.error('Error loading earnings data:', error);
+      Alert.alert('Error', 'Failed to load earnings data');
+    } finally {
+      setIsLoading(false);
+    }
   };
-  
-  // Get chart data based on selected period
-  const getChartData = () => {
-    switch (selectedPeriod) {
+
+  const loadRecentTransactions = async () => {
+    try {
+      const transactions = await transactionService.getUserTransactions(user.id, 10);
+      // Filter to show only earnings-related transactions
+      const earningsTransactions = transactions.filter(t => 
+        ['deposit_received', 'payout'].includes(t.type)
+      );
+      setRecentTransactions(earningsTransactions);
+    } catch (error) {
+      console.error('Error loading recent transactions:', error);
+    }
+  };
+
+  const generateChartData = async () => {
+    try {
+      const transactions = await transactionService.getUserTransactions(user.id, 100);
+      const earningsTransactions = transactions.filter(t => t.type === 'deposit_received');
+      
+      const data = generatePeriodData(earningsTransactions, selectedPeriod);
+      setChartData(data);
+    } catch (error) {
+      console.error('Error generating chart data:', error);
+    }
+  };
+
+  const generatePeriodData = (transactions, period) => {
+    const now = new Date();
+    let data = [];
+
+    switch (period) {
       case 'week':
-        return earnings.weeklyData;
+        // Generate data for last 7 days
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date(now);
+          date.setDate(date.getDate() - i);
+          const dayTransactions = transactions.filter(t => {
+            const tDate = new Date(t.createdAt);
+            return tDate.toDateString() === date.toDateString();
+          });
+          const total = dayTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+          
+          data.push({
+            label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+            value: total
+          });
+        }
+        break;
+        
       case 'month':
-        return earnings.monthlyData;
+        // Generate data for last 4 weeks
+        for (let i = 3; i >= 0; i--) {
+          const startDate = new Date(now);
+          startDate.setDate(startDate.getDate() - (i + 1) * 7);
+          const endDate = new Date(now);
+          endDate.setDate(endDate.getDate() - i * 7);
+          
+          const weekTransactions = transactions.filter(t => {
+            const tDate = new Date(t.createdAt);
+            return tDate >= startDate && tDate < endDate;
+          });
+          const total = weekTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+          
+          data.push({
+            label: `Week ${4 - i}`,
+            value: total
+          });
+        }
+        break;
+        
       case 'year':
-        return earnings.yearlyData;
-      default:
-        return earnings.weeklyData;
+        // Generate data for last 6 months
+        for (let i = 5; i >= 0; i--) {
+          const date = new Date(now);
+          date.setMonth(date.getMonth() - i);
+          const monthTransactions = transactions.filter(t => {
+            const tDate = new Date(t.createdAt);
+            return tDate.getMonth() === date.getMonth() && 
+                   tDate.getFullYear() === date.getFullYear();
+          });
+          const total = monthTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+          
+          data.push({
+            label: date.toLocaleDateString('en-US', { month: 'short' }),
+            value: total
+          });
+        }
+        break;
     }
+
+    return data;
   };
-  
-  // Get color for transaction status
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return '#4CAF50';
-      case 'pending': return '#FB8C00';
-      case 'failed': return '#F44336';
-      default: return '#9E9E9E';
+
+  useEffect(() => {
+    if (!isLoading) {
+      generateChartData();
     }
-  };
-  
-  // Get icon for transaction type
-  const getTransactionIcon = (type) => {
-    switch (type) {
-      case 'earning': return 'cash-outline';
-      case 'payout': return 'wallet-outline';
-      default: return 'receipt-outline';
+  }, [selectedPeriod, isLoading]);
+
+  const handleWithdraw = () => {
+    if (earnings.availableBalance <= 0) {
+      Alert.alert('No Balance', 'You have no available balance to withdraw.');
+      return;
     }
+    
+    Alert.alert(
+      'Withdraw Funds',
+      `You have RM ${earnings.availableBalance.toFixed(2)} available. Would you like to proceed with withdrawal?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Withdraw', 
+          onPress: () => navigation.navigate('Withdrawal', { 
+            availableBalance: earnings.availableBalance 
+          })
+        }
+      ]
+    );
   };
-  
-  // Format date
+
   const formatDate = (dateString) => {
     const options = { month: 'short', day: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
-  
-  // Find maximum value in chart data for scaling
+
+  const getTransactionIcon = (type) => {
+    switch (type) {
+      case 'deposit_received': return 'cash-outline';
+      case 'payout': return 'wallet-outline';
+      default: return 'receipt-outline';
+    }
+  };
+
+  const getTransactionColor = (type) => {
+    switch (type) {
+      case 'deposit_received': return Colors.success;
+      case 'payout': return Colors.warning;
+      default: return Colors.textMedium;
+    }
+  };
+
   const getMaxValue = (data) => {
     if (!data || !data.length) return 0;
     return Math.max(...data.map(item => item.value));
   };
-  
-  // Custom chart component
+
   const SimpleBarChart = ({ data }) => {
     if (!data || !data.length) return null;
     
@@ -169,7 +213,7 @@ const EarningsScreen = ({ navigation }) => {
               <View key={index} style={styles.barWrapper}>
                 <View style={styles.barLabelContainer}>
                   <Text style={styles.barValue}>
-                    {item.value > 0 ? `RM${item.value}` : ''}
+                    {item.value > 0 ? `RM${item.value.toFixed(0)}` : ''}
                   </Text>
                 </View>
                 <View 
@@ -189,25 +233,27 @@ const EarningsScreen = ({ navigation }) => {
       </View>
     );
   };
-  
-  // Render transaction item
+
   const renderTransactionItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.transactionItem}
+      onPress={() => navigation.navigate('TransactionHistory')}
       activeOpacity={0.7}
     >
-      <View style={[styles.iconContainer, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-        <Ionicons name={getTransactionIcon(item.type)} size={22} color={getStatusColor(item.status)} />
+      <View style={[styles.iconContainer, { backgroundColor: getTransactionColor(item.type) + '20' }]}>
+        <Ionicons name={getTransactionIcon(item.type)} size={22} color={getTransactionColor(item.type)} />
       </View>
       
       <View style={styles.transactionDetails}>
-        <Text style={styles.transactionTitle} numberOfLines={1}>{item.project}</Text>
+        <Text style={styles.transactionTitle} numberOfLines={1}>
+          {item.description}
+        </Text>
         
         <View style={styles.transactionSubDetails}>
-          <Text style={styles.transactionDate}>{formatDate(item.date)}</Text>
+          <Text style={styles.transactionDate}>{formatDate(item.createdAt)}</Text>
           <View style={styles.statusBadge}>
-            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-              {item.status === 'pending' ? 'Pending' : 'Completed'}
+            <Text style={[styles.statusText, { color: getTransactionColor(item.type) }]}>
+              {item.status === 'completed' ? 'Completed' : item.status}
             </Text>
           </View>
         </View>
@@ -215,156 +261,170 @@ const EarningsScreen = ({ navigation }) => {
       
       <Text style={[
         styles.transactionAmount,
-        { color: item.type === 'payout' ? '#333333' : Colors.primary }
+        { color: item.type === 'payout' ? Colors.warning : Colors.success }
       ]}>
-        {item.type === 'payout' ? '-' : '+'}RM{item.amount}
+        {item.type === 'payout' ? '-' : '+'}RM{parseFloat(item.amount).toFixed(2)}
       </Text>
     </TouchableOpacity>
   );
 
-  return (
-    <SafeAreaView style={styles.container}>
-      {isLoading ? (
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={styles.loadingText}>Loading earnings data...</Text>
         </View>
-      ) : (
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* Balance Cards */}
-          <View style={styles.balanceCards}>
-            <View style={styles.balanceCard}>
-              <Text style={styles.balanceTitle}>Available Balance</Text>
-              <Text style={styles.balanceAmount}>RM {earnings.availableBalance.toFixed(2)}</Text>
-              <TouchableOpacity 
-                style={styles.withdrawButton}
-                onPress={handleWithdraw}
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Balance Cards */}
+        <View style={styles.balanceCards}>
+          <View style={styles.balanceCard}>
+            <Text style={styles.balanceTitle}>Available Balance</Text>
+            <Text style={styles.balanceAmount}>RM {earnings.availableBalance.toFixed(2)}</Text>
+            <TouchableOpacity 
+              style={[
+                styles.withdrawButton,
+                earnings.availableBalance <= 0 && styles.disabledButton
+              ]}
+              onPress={handleWithdraw}
+              disabled={earnings.availableBalance <= 0}
+            >
+              <Text style={styles.withdrawButtonText}>Withdraw</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.balanceCard}>
+            <Text style={styles.balanceTitle}>Total Payouts</Text>
+            <Text style={styles.balanceAmount}>RM {earnings.totalPayouts.toFixed(2)}</Text>
+            <Text style={styles.pendingNote}>Withdrawn to bank</Text>
+          </View>
+        </View>
+        
+        {/* Total Earnings */}
+        <View style={styles.totalEarningsContainer}>
+          <Text style={styles.sectionTitle}>Total Earnings</Text>
+          <Text style={styles.totalEarningsAmount}>
+            RM {earnings.totalEarnings.toFixed(2)}
+          </Text>
+          <Text style={styles.earningsNote}>
+            From {earnings.transactionCount} completed job{earnings.transactionCount !== 1 ? 's' : ''}
+          </Text>
+        </View>
+        
+        {/* Earnings Chart */}
+        <View style={styles.chartSection}>
+          <View style={styles.chartHeader}>
+            <Text style={styles.sectionTitle}>Earnings History</Text>
+            <View style={styles.periodSelector}>
+              <TouchableOpacity
+                style={[
+                  styles.periodButton,
+                  selectedPeriod === 'week' && styles.activePeriodButton
+                ]}
+                onPress={() => setSelectedPeriod('week')}
               >
-                <Text style={styles.withdrawButtonText}>Withdraw</Text>
+                <Text style={[
+                  styles.periodButtonText,
+                  selectedPeriod === 'week' && styles.activePeriodText
+                ]}>Week</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.periodButton,
+                  selectedPeriod === 'month' && styles.activePeriodButton
+                ]}
+                onPress={() => setSelectedPeriod('month')}
+              >
+                <Text style={[
+                  styles.periodButtonText,
+                  selectedPeriod === 'month' && styles.activePeriodText
+                ]}>Month</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[
+                  styles.periodButton,
+                  selectedPeriod === 'year' && styles.activePeriodButton
+                ]}
+                onPress={() => setSelectedPeriod('year')}
+              >
+                <Text style={[
+                  styles.periodButtonText,
+                  selectedPeriod === 'year' && styles.activePeriodText
+                ]}>Year</Text>
               </TouchableOpacity>
             </View>
-            
-            <View style={styles.balanceCard}>
-              <Text style={styles.balanceTitle}>Pending</Text>
-              <Text style={styles.balanceAmount}>RM {earnings.pendingBalance.toFixed(2)}</Text>
-              <Text style={styles.pendingNote}>Funds in escrow</Text>
+          </View>
+          
+          <SimpleBarChart data={chartData} />
+        </View>
+        
+        {/* Recent Transactions */}
+        <View style={styles.transactionsContainer}>
+          <View style={styles.transactionsHeader}>
+            <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          <TouchableOpacity 
+            style={styles.viewAllButton}
+            onPress={() => navigation.navigate('TransactionHistory')} // UPDATED
+          >
+            <Text style={styles.viewAllText}>View All</Text>
+          </TouchableOpacity>
+          </View>
+          
+          {recentTransactions.length > 0 ? (
+            <FlatList
+              data={recentTransactions.slice(0, 5)}
+              renderItem={renderTransactionItem}
+              keyExtractor={item => item.id}
+              scrollEnabled={false}
+              ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+            />
+          ) : (
+            <View style={styles.emptyTransactions}>
+              <Ionicons name="receipt-outline" size={48} color="#DDD" />
+              <Text style={styles.emptyText}>No transactions yet</Text>
+              <Text style={styles.emptySubText}>Complete jobs to start earning</Text>
             </View>
-          </View>
+          )}
+        </View>
+        
+        {/* Performance Stats */}
+        <View style={styles.statsContainer}>
+          <Text style={styles.sectionTitle}>Performance</Text>
           
-          {/* Total Earnings */}
-          <View style={styles.totalEarningsContainer}>
-            <Text style={styles.sectionTitle}>Total Earnings</Text>
-            <Text style={styles.totalEarningsAmount}>
-              RM {earnings.totalEarnings.toFixed(2)}
-            </Text>
-          </View>
-          
-          {/* Earnings Chart */}
-          <View style={styles.chartSection}>
-            <View style={styles.chartHeader}>
-              <Text style={styles.sectionTitle}>Earnings History</Text>
-              <View style={styles.periodSelector}>
-                <TouchableOpacity
-                  style={[
-                    styles.periodButton,
-                    selectedPeriod === 'week' && styles.activePeriodButton
-                  ]}
-                  onPress={() => setSelectedPeriod('week')}
-                >
-                  <Text style={[
-                    styles.periodButtonText,
-                    selectedPeriod === 'week' && styles.activePeriodText
-                  ]}>Week</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.periodButton,
-                    selectedPeriod === 'month' && styles.activePeriodButton
-                  ]}
-                  onPress={() => setSelectedPeriod('month')}
-                >
-                  <Text style={[
-                    styles.periodButtonText,
-                    selectedPeriod === 'month' && styles.activePeriodText
-                  ]}>Month</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.periodButton,
-                    selectedPeriod === 'year' && styles.activePeriodButton
-                  ]}
-                  onPress={() => setSelectedPeriod('year')}
-                >
-                  <Text style={[
-                    styles.periodButtonText,
-                    selectedPeriod === 'year' && styles.activePeriodText
-                  ]}>Year</Text>
-                </TouchableOpacity>
-              </View>
+          <View style={styles.statsCards}>
+            <View style={styles.statsCard}>
+              <Ionicons name="star-outline" size={24} color={Colors.primary} />
+              <Text style={styles.statsValue}>4.8</Text>
+              <Text style={styles.statsLabel}>Average Rating</Text>
             </View>
             
-            <SimpleBarChart data={getChartData()} />
-          </View>
-          
-          {/* Recent Transactions */}
-          <View style={styles.transactionsContainer}>
-            <View style={styles.transactionsHeader}>
-              <Text style={styles.sectionTitle}>Recent Transactions</Text>
-              <TouchableOpacity 
-                style={styles.viewAllButton}
-                onPress={() => navigation.navigate('TransactionHistory')}
-              >
-                <Text style={styles.viewAllText}>View All</Text>
-              </TouchableOpacity>
+            <View style={styles.statsCard}>
+              <Ionicons name="people-outline" size={24} color={Colors.primary} />
+              <Text style={styles.statsValue}>{earnings.transactionCount}</Text>
+              <Text style={styles.statsLabel}>Jobs Completed</Text>
             </View>
             
-            {earnings.recentTransactions.length > 0 ? (
-              <FlatList
-                data={earnings.recentTransactions}
-                renderItem={renderTransactionItem}
-                keyExtractor={item => item.id}
-                scrollEnabled={false}
-                ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-              />
-            ) : (
-              <View style={styles.emptyTransactions}>
-                <Ionicons name="receipt-outline" size={48} color="#DDD" />
-                <Text style={styles.emptyText}>No transactions yet</Text>
-              </View>
-            )}
-          </View>
-          
-          {/* Statistics Cards */}
-          <View style={styles.statsContainer}>
-            <Text style={styles.sectionTitle}>Performance</Text>
-            
-            <View style={styles.statsCards}>
-              <View style={styles.statsCard}>
-                <Ionicons name="star-outline" size={24} color={Colors.primary} />
-                <Text style={styles.statsValue}>4.8</Text>
-                <Text style={styles.statsLabel}>Average Rating</Text>
-              </View>
-              
-              <View style={styles.statsCard}>
-                <Ionicons name="people-outline" size={24} color={Colors.primary} />
-                <Text style={styles.statsValue}>26</Text>
-                <Text style={styles.statsLabel}>Clients Served</Text>
-              </View>
-              
-              <View style={styles.statsCard}>
-                <Ionicons name="construct-outline" size={24} color={Colors.primary} />
-                <Text style={styles.statsValue}>42</Text>
-                <Text style={styles.statsLabel}>Jobs Completed</Text>
-              </View>
+            <View style={styles.statsCard}>
+              <Ionicons name="trending-up-outline" size={24} color={Colors.primary} />
+              <Text style={styles.statsValue}>
+                {earnings.transactionCount > 0 ? (earnings.totalEarnings / earnings.transactionCount).toFixed(0) : '0'}
+              </Text>
+              <Text style={styles.statsLabel}>Avg per Job</Text>
             </View>
           </View>
-          
-          {/* Bottom padding */}
-          <View style={{ height: 20 }} />
-        </ScrollView>
-      )}
+        </View>
+        
+        {/* Bottom padding */}
+        <View style={{ height: 20 }} />
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -421,6 +481,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
   },
+  disabledButton: {
+    backgroundColor: '#CCCCCC',
+  },
   withdrawButtonText: {
     color: '#FFFFFF',
     fontSize: 14,
@@ -428,7 +491,7 @@ const styles = StyleSheet.create({
   },
   pendingNote: {
     fontSize: 12,
-    color: '#FB8C00',
+    color: '#999999',
     marginTop: 8,
   },
   totalEarningsContainer: {
@@ -452,6 +515,11 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: Colors.primary,
+    marginBottom: 4,
+  },
+  earningsNote: {
+    fontSize: 14,
+    color: '#666666',
   },
   chartSection: {
     backgroundColor: '#FFFFFF',
@@ -613,6 +681,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666666',
     marginTop: 8,
+  },
+  emptySubText: {
+    fontSize: 12,
+    color: '#999999',
+    marginTop: 4,
   },
   statsContainer: {
     backgroundColor: '#FFFFFF',

@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
 import { useAuth } from '../context/AuthContext';
 import { projectService } from '../services/projectService';
+import { transactionService } from '../services/transactionService';
 
 const PaymentScreen = ({ route, navigation }) => {
   const { projectDetails } = route.params || {};
@@ -30,56 +31,58 @@ const depositAmount = currentProject?.depositAmount || 0;
 const serviceFee = Math.round(depositAmount * 0.05);
 const total = depositAmount + serviceFee;
 
-  // Mock payment processing
-// Direct payment processing (no gateway)
-const processPayment = () => {
+const processPayment = async () => {
   setIsProcessing(true);
   
-  // Simulate payment processing
-  setTimeout(async () => {
-    try {
-      // Update project status to in_progress after payment
-      await projectService.updateProjectStatus(currentProject.id, 'in_progress', {
-        depositPaidAt: new Date().toISOString(),
-        depositPaidAmount: total,
-        paymentMethod: 'direct_transfer'
-      });
-      setIsProcessing(false);
-      
-      // Generate transaction record
-      const transaction = {
-        id: Math.random().toString(36).substr(2, 9),
-        date: new Date().toISOString(),
-        amount: total,
-       description: `Deposit for ${currentProject.title}`,
-        status: 'completed',
-        paymentMethod: 'direct_transfer',
-        projectId: projectDetails.id
-      };
-      
-      // Navigate to success screen
-      navigation.navigate('PaymentSuccess', { 
-        transaction: transaction,
-        projectDetails: currentProject
-      });
-    } catch (error) {
-      console.error('Error updating project after payment:', error);
-      setIsProcessing(false);
-      Alert.alert('Error', 'Payment processed but failed to update project status.');
-    }
-  }, 2000);
+  try {
+    // Update project status to in_progress after payment
+    await projectService.updateProjectStatus(currentProject.id, 'in_progress', {
+      depositPaidAt: new Date().toISOString(),
+      depositPaidAmount: total,
+      paymentMethod: 'direct_transfer'
+    });
+    
+    // ADD: Record transaction
+    await transactionService.recordDepositPayment(
+      currentProject.id,
+      user.id,
+      currentProject.handymanId,
+      depositAmount,
+      {
+        projectTitle: currentProject.title,
+        customerName: user.name,
+        handymanName: currentProject.handymanName,
+        paymentMethod: selectedMethod === 'card' ? 'card' : selectedMethod,
+        transactionId: `PAY_${Date.now()}`
+      }
+    );
+    
+    setIsProcessing(false);
+    
+    // Generate transaction record
+    const transaction = {
+      id: `PAY_${Date.now()}`,
+      date: new Date().toISOString(),
+      amount: total,
+      description: `Deposit for ${currentProject.title}`,
+      status: 'completed',
+      paymentMethod: selectedMethod === 'card' ? 'card' : selectedMethod,
+      projectId: currentProject.id
+    };
+    
+    // Navigate to success screen
+    navigation.navigate('PaymentSuccess', { 
+      transaction: transaction,
+      projectDetails: currentProject
+    });
+  } catch (error) {
+    console.error('Error processing payment:', error);
+    setIsProcessing(false);
+    Alert.alert('Error', 'Payment failed. Please try again.');
+  }
 };
   
-  // Save transaction to mock storage
-  const saveTransaction = (transaction) => {
-    // This would normally save to a database
-    console.log('Transaction saved:', transaction);
-    
-    // In a real app, you would:
-    // 1. Save to AsyncStorage
-    // 2. Update a context
-    // 3. Make an API call to your backend
-  };
+ 
   
   // Confirm payment
   const confirmPayment = () => {

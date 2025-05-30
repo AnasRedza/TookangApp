@@ -281,8 +281,18 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.actionText}>Notification Settings</Text>
             <Ionicons name="chevron-forward" size={20} color="#CCCCCC" />
           </TouchableOpacity>
+          // ADD this TouchableOpacity after the NotificationSettings button
 
           <TouchableOpacity 
+            style={styles.actionItem}
+            onPress={() => navigation.navigate('TransactionHistory')}
+          >
+            <Ionicons name="receipt-outline" size={20} color="#777777" style={styles.infoIcon} />
+            <Text style={styles.actionText}>Transaction History</Text>
+            <Ionicons name="chevron-forward" size={20} color="#CCCCCC" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+          
             style={[styles.actionItem, styles.logoutItem]}
             onPress={handleLogout}
           >

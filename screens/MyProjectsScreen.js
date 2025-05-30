@@ -20,6 +20,8 @@ import Colors from '../constants/Colors';
 import firebase from '../firebase';
 import { getUserAvatarUri } from '../utils/imageUtils';
 import { reviewService } from '../services/reviewService';
+// ADD this import (around line 15)
+import { transactionService } from '../services/transactionService';
 
 
 const MyProjectsScreen = ({ route, navigation }) => {
@@ -164,7 +166,9 @@ const handlePayForProject = async (project) => {
           screen: 'Payment',
           params: {
             project: project,
-            projectDetails: project // For compatibility with PaymentScreen
+            projectDetails: project,
+            // ADD: Pass deposit amount from project
+            depositAmount: project.depositAmount || 0
           }
         },
       })
