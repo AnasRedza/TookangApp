@@ -1,4 +1,4 @@
-// Enhanced services/chatService.js - Support for project negotiations
+// Enhanced services/chatService.js - Support for image messages and project negotiations
 import { db } from '../firebase';
 import firebase from 'firebase/compat/app';
 import { userService } from './userService';
@@ -74,7 +74,7 @@ export const chatService = {
     }
   },
 
-  // Send a message with enhanced types
+  // Enhanced send message with support for different message types including images
   sendMessage: async (conversationId, senderId, senderName, messageText, messageType = 'text', additionalData = {}) => {
     try {
       const batch = db.batch();
@@ -88,12 +88,17 @@ export const chatService = {
         text: messageText.trim(),
         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
         read: false,
-        type: messageType, // 'text', 'offer', 'system', 'negotiation'
-        imageUrl: null,
+        type: messageType, // 'text', 'image', 'offer', 'system', 'negotiation'
         edited: false,
         editedAt: null,
         ...additionalData
       };
+      
+      // For image messages, ensure imageUrl is properly stored
+      if (messageType === 'image' && additionalData.imageUrl) {
+        messageData.imageUrl = additionalData.imageUrl;
+      }
+      
       batch.set(messageRef, messageData);
       
       // Update conversation with last message info and increment unread count
@@ -104,10 +109,21 @@ export const chatService = {
       // Get the other participant
       const otherParticipantId = conversationData.participants.find(p => p !== senderId);
       
+      // Determine last message preview text based on message type
+      let lastMessagePreview = messageText.trim();
+      if (messageType === 'image') {
+        lastMessagePreview = '📷 Image';
+      } else if (messageType === 'offer') {
+        lastMessagePreview = '💼 New Offer';
+      } else if (messageType === 'system') {
+        lastMessagePreview = '🔔 System Message';
+      }
+      
       const conversationUpdate = {
-        lastMessage: messageText.trim(),
+        lastMessage: lastMessagePreview,
         lastMessageTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
         lastMessageSender: senderId,
+        lastMessageType: messageType,
         [`unreadCount.${otherParticipantId}`]: firebase.firestore.FieldValue.increment(1),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       };
@@ -144,9 +160,10 @@ export const chatService = {
       
       // Update conversation last message
       await db.collection('conversations').doc(conversationId).update({
-        lastMessage: messageText,
+        lastMessage: '🔔 System Message',
         lastMessageTimestamp: firebase.firestore.FieldValue.serverTimestamp(),
         lastMessageSender: 'system',
+        lastMessageType: 'system',
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       
@@ -180,6 +197,27 @@ export const chatService = {
       );
     } catch (error) {
       console.error('Error sending offer message:', error);
+      throw error;
+    }
+  },
+
+  // Send image message (dedicated method for cleaner code)
+  sendImageMessage: async (conversationId, senderId, senderName, imageUrl, caption = '') => {
+    try {
+      const messageText = caption || '📷 Image';
+      
+      return await chatService.sendMessage(
+        conversationId,
+        senderId,
+        senderName,
+        messageText,
+        'image',
+        {
+          imageUrl: imageUrl
+        }
+      );
+    } catch (error) {
+      console.error('Error sending image message:', error);
       throw error;
     }
   },
@@ -242,7 +280,7 @@ export const chatService = {
     }
   },
 
-  // Subscribe to messages (real-time)
+  // Subscribe to messages (real-time) with enhanced image support
   subscribeToMessages: (conversationId, onUpdate, onError) => {
     try {
       const unsubscribe = db.collection('conversations')
@@ -256,7 +294,8 @@ export const chatService = {
               return {
                 id: doc.id,
                 ...data,
-                timestamp: data.timestamp?.toDate()?.toISOString()
+                timestamp: data.timestamp?.toDate()?.toISOString(),
+                editedAt: data.editedAt?.toDate()?.toISOString()
               };
             });
             onUpdate(messages);
@@ -359,6 +398,139 @@ export const chatService = {
       });
     } catch (error) {
       console.error('Error getting project conversations:', error);
+      throw error;
+    }
+  },
+
+  // Delete a message (soft delete)
+  deleteMessage: async (conversationId, messageId, userId) => {
+    try {
+      const messageRef = db.collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .doc(messageId);
+      
+      const messageDoc = await messageRef.get();
+      if (!messageDoc.exists) {
+        throw new Error('Message not found');
+      }
+      
+      const messageData = messageDoc.data();
+      
+      // Only allow sender to delete their own messages
+      if (messageData.senderId !== userId) {
+        throw new Error('Unauthorized to delete this message');
+      }
+      
+      // Soft delete by updating the message
+      await messageRef.update({
+        text: 'Message deleted',
+        deleted: true,
+        deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        imageUrl: null // Remove image URL if it was an image message
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      throw error;
+    }
+  },
+
+  // Edit a message
+  editMessage: async (conversationId, messageId, newText, userId) => {
+    try {
+      const messageRef = db.collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .doc(messageId);
+      
+      const messageDoc = await messageRef.get();
+      if (!messageDoc.exists) {
+        throw new Error('Message not found');
+      }
+      
+      const messageData = messageDoc.data();
+      
+      // Only allow sender to edit their own messages
+      if (messageData.senderId !== userId) {
+        throw new Error('Unauthorized to edit this message');
+      }
+      
+      // Don't allow editing of system messages or image messages
+      if (messageData.type === 'system' || messageData.type === 'image') {
+        throw new Error('Cannot edit this type of message');
+      }
+      
+      await messageRef.update({
+        text: newText.trim(),
+        edited: true,
+        editedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error editing message:', error);
+      throw error;
+    }
+  },
+
+  // Get messages with pagination
+  getMessages: async (conversationId, limit = 50, lastMessage = null) => {
+    try {
+      let query = db.collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .orderBy('timestamp', 'desc')
+        .limit(limit);
+
+      if (lastMessage) {
+        query = query.startAfter(lastMessage.timestamp);
+      }
+
+      const snapshot = await query.get();
+      
+      return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          timestamp: data.timestamp?.toDate()?.toISOString(),
+          editedAt: data.editedAt?.toDate()?.toISOString()
+        };
+      }).reverse(); // Reverse to get chronological order
+    } catch (error) {
+      console.error('Error getting messages:', error);
+      throw error;
+    }
+  },
+
+  // Search messages within a conversation
+  searchMessages: async (conversationId, searchTerm) => {
+    try {
+      const messagesSnapshot = await db.collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .orderBy('timestamp', 'desc')
+        .get();
+      
+      const searchTermLower = searchTerm.toLowerCase();
+      const matchingMessages = [];
+      
+      messagesSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.text && data.text.toLowerCase().includes(searchTermLower)) {
+          matchingMessages.push({
+            id: doc.id,
+            ...data,
+            timestamp: data.timestamp?.toDate()?.toISOString()
+          });
+        }
+      });
+      
+      return matchingMessages;
+    } catch (error) {
+      console.error('Error searching messages:', error);
       throw error;
     }
   }
