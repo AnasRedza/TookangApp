@@ -78,13 +78,13 @@ const EarningsScreen = ({ navigation }) => {
     }
   };
 
-  const getMonthlyEarnings = () => {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    return recentTransactions
-      .filter(t => t.type === 'deposit_received' && new Date(t.createdAt) >= monthStart)
-      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-  };
+const getMonthlyEarnings = () => {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  return recentTransactions
+    .filter(t => t.type === 'deposit_received' && t.status === 'completed' && new Date(t.createdAt) >= monthStart)
+    .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+};
 
   const getWeeklyEarnings = () => {
     const now = new Date();

@@ -421,28 +421,7 @@ const SettingsStack = () => {
   );
 };
 
-// Payment Methods Stack Navigator
-const PaymentMethodsStack = () => {
-  return (
-    <Stack.Navigator 
-      initialRouteName="PaymentMethods"
-      screenOptions={({ navigation }) => ({
-        ...screenOptionsBase,
-        headerLeft: () => (
-          <TouchableOpacity 
-            style={{ marginLeft: 15 }}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-        ),
-        headerTitle: () => <LogoTitle />
-      })}
-    >
-      <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
-    </Stack.Navigator>
-  );
-};
+
 
 // Earnings Stack Navigator (for handymen)
 const EarningsStack = () => {
@@ -690,17 +669,6 @@ const CustomDrawerContent = (props) => {
       ) : (
         // Customer - Only show payment methods and other specified menu items
         <View>
-          {/* Payment Methods */}
-          <TouchableOpacity 
-            style={styles.drawerItem}
-            onPress={() => {
-              props.navigation.closeDrawer();
-              props.navigation.navigate('PaymentMethodsDrawer');
-            }}
-          >
-            <Ionicons name="card" size={24} color="#666" style={styles.drawerItemIcon} />
-            <Text style={styles.drawerItemText}>Payment Methods</Text>
-          </TouchableOpacity>
           
           {/* Transaction History */}
           <TouchableOpacity 
@@ -819,17 +787,6 @@ const MainDrawer = () => {
         />
       )}
       
-      {/* Payment Methods */}
-      <Drawer.Screen 
-        name="PaymentMethodsDrawer" 
-        component={PaymentMethodsStack} 
-        options={{
-          title: 'Payment Methods',
-          drawerIcon: ({ color, size }) => (
-            <Ionicons name="card" color={color} size={size} />
-          )
-        }}
-      />
       
       {/* Earnings - only for handyman but registered for navigation */}
       <Drawer.Screen 

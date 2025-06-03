@@ -21,7 +21,7 @@ const PaymentScreen = ({ route, navigation }) => {
   const { projectDetails } = route.params || {};
   const { user } = useAuth();
   const currentProject = projectDetails || {};
-  const [selectedMethod, setSelectedMethod] = useState('card');
+  const [selectedMethod, setSelectedMethod] = useState('banking');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showWebView, setShowWebView] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState('');
@@ -49,34 +49,14 @@ const PaymentScreen = ({ route, navigation }) => {
   };
 
   // Get payment method display info
-  const getPaymentMethodInfo = (method) => {
-    switch(method) {
-      case 'card':
-        return {
-          name: 'Credit/Debit Card',
-          icon: 'card-outline',
-          description: 'Visa, Mastercard, etc.'
-        };
-      case 'banking':
-        return {
-          name: 'Online Banking',
-          icon: 'business-outline',
-          description: 'Maybank, CIMB, Public Bank, etc.'
-        };
-      case 'ewallet':
-        return {
-          name: 'E-Wallet',
-          icon: 'wallet-outline',
-          description: 'Touch \'n Go, Boost, GrabPay, etc.'
-        };
-      default:
-        return {
-          name: 'Payment',
-          icon: 'card-outline',
-          description: 'Multiple options'
-        };
-    }
+// Get payment method display info
+const getPaymentMethodInfo = (method) => {
+  return {
+    name: 'Online Banking',
+    icon: 'business-outline',
+    description: 'Maybank, CIMB, Public Bank, etc.'
   };
+};
 
   // Helper function to create a short bill name
   const createBillName = (projectTitle) => {
@@ -123,71 +103,64 @@ const PaymentScreen = ({ route, navigation }) => {
 
       // Create toyyibPay bill with proper channel filtering
       const paymentChannel = getPaymentChannel(selectedMethod);
-      const billData = {
-        billName: createBillName(currentProject.title),
-        billDescription: `Deposit payment for handyman service: ${currentProject.title}`,
-        amount: total,
-        customerName: user.name || user.displayName || 'Customer',
-        customerEmail: user.email,
-        customerPhone: (user.phoneNumber || '0123456789').substring(0, 15),
-        referenceNo: `PROJ_${currentProject.id}_${Date.now()}`,
-        returnUrl: 'https://yourapp.com/payment/success',
-        callbackUrl: 'https://yourapp.com/api/payment/callback',
-        expiryDays: 1,
-        paymentChannel: paymentChannel // This will filter available payment methods
-      };
+      // Create toyyibPay bill - banking only
+// Create toyyibPay bill - banking only
+const billData = {
+  billName: createBillName(currentProject.title),
+  billDescription: `Deposit payment for handyman service: ${currentProject.title}`,
+  amount: total,
+  customerName: user.name || user.displayName || 'Customer',
+  customerEmail: user.email,
+  customerPhone: (user.phoneNumber || '0123456789').substring(0, 15),
+  referenceNo: `PROJ_${currentProject.id}_${Date.now()}`,
+  returnUrl: 'https://yourapp.com/payment/success',
+  callbackUrl: 'https://yourapp.com/api/payment/callback',
+  expiryDays: 1,
+  paymentChannel: '2' // Online Banking only
+};
 
-      console.log('Creating toyyibPay bill with data:', billData);
-      console.log(`Selected payment method: ${selectedMethod}, Channel: ${paymentChannel}`);
-      
-      const response = await toyyibPayService.createBill(billData);
-      
-      if (response && response[0]?.BillCode) {
-        const newBillCode = response[0].BillCode;
-        setBillCode(newBillCode);
-        
-        // Update both transactions with the bill code
-        await Promise.all([
-          transactionService.updateTransactionStatus(
-            transactionResult.customerTransaction.id,
-            'pending',
-            { 
-              toyyibPayBillCode: newBillCode,
-              selectedPaymentMethod: selectedMethod,
-              paymentChannel: paymentChannel
-            }
-          ),
-          transactionService.updateTransactionStatus(
-            transactionResult.handymanTransaction.id,
-            'pending',
-            { 
-              toyyibPayBillCode: newBillCode,
-              selectedPaymentMethod: selectedMethod,
-              paymentChannel: paymentChannel
-            }
-          )
-        ]);
-        
-        // Create payment URL with additional filtering parameters
-        let paymentURL = `https://dev.toyyibpay.com/${newBillCode}`;
-        
-        // Add URL parameters for better payment method filtering
-        if (selectedMethod === 'card') {
-          paymentURL += '?payment_type=card';
-        } else if (selectedMethod === 'banking') {
-          paymentURL += '?payment_type=fpx';
-        } else if (selectedMethod === 'ewallet') {
-          paymentURL += '?payment_type=ewallet';
-        }
-        
-        console.log(`Opening payment URL: ${paymentURL}`);
-        setPaymentUrl(paymentURL);
-        setShowWebView(true);
-        setIsProcessing(false);
-        
-      } else {
-        throw new Error('Failed to create payment bill');
+console.log('Creating toyyibPay bill with data:', billData);
+console.log('Using Online Banking payment method');
+
+const response = await toyyibPayService.createBill(billData);
+
+if (response && response[0]?.BillCode) {
+  const newBillCode = response[0].BillCode;
+  setBillCode(newBillCode);
+  
+  // Update both transactions with the bill code
+  await Promise.all([
+    transactionService.updateTransactionStatus(
+      transactionResult.customerTransaction.id,
+      'pending',
+      { 
+        toyyibPayBillCode: newBillCode,
+        selectedPaymentMethod: 'banking',
+        paymentChannel: '2'
       }
+    ),
+    transactionService.updateTransactionStatus(
+      transactionResult.handymanTransaction.id,
+      'pending',
+      { 
+        toyyibPayBillCode: newBillCode,
+        selectedPaymentMethod: 'banking',
+        paymentChannel: '2'
+      }
+    )
+  ]);
+  
+  // Create payment URL for banking
+  const paymentURL = `https://dev.toyyibpay.com/${newBillCode}?payment_type=fpx`;
+  
+  console.log(`Opening Online Banking payment URL: ${paymentURL}`);
+  setPaymentUrl(paymentURL);
+  setShowWebView(true);
+  setIsProcessing(false);
+  
+} else {
+  throw new Error('Failed to create payment bill');
+}
     } catch (error) {
       console.error('Error creating payment:', error);
       setIsProcessing(false);
@@ -199,43 +172,48 @@ const PaymentScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleWebViewNavigationStateChange = (navState) => {
-    const { url } = navState;
-    console.log('WebView navigation:', url);
-    
-    // Check for payment completion indicators
-    if (url.includes('payment/success') || 
-        url.includes('status_id=1') || 
-        url.includes('transaction_status=1')) {
-      setShowWebView(false);
-      handlePaymentSuccess();
-    } else if (url.includes('payment/failed') || 
-               url.includes('status_id=3') ||
-               url.includes('transaction_status=3')) {
-      setShowWebView(false);
-      handlePaymentFailure();
-    }
-  };
+const handleWebViewNavigationStateChange = (navState) => {
+  const { url } = navState;
+  console.log('WebView navigation URL:', url);
+  
+  // More specific success detection - only trigger on actual success URLs
+  if (url.includes('status_id=1') || 
+      url.includes('transaction_status=1')) {
+    console.log('✅ Payment SUCCESS detected via status_id=1');
+    setShowWebView(false);
+    handlePaymentSuccess();
+  } 
+  // More specific failure detection
+  else if (url.includes('status_id=3') || 
+           url.includes('transaction_status=3') ||
+           url.includes('status_id=2')) { // 2 is also a failure status in some cases
+    console.log('❌ Payment FAILURE detected via status_id=3 or status_id=2');
+    setShowWebView(false);
+    handlePaymentFailure();
+  }
+  // Don't react to other URL patterns that might be misleading
+};
 
-  const handleWebViewLoadEnd = (navState) => {
-    const { url } = navState.nativeEvent;
-    console.log('WebView load end:', url);
-    
-    // Check for payment completion in load end event as well
-    if (url.includes('payment/success') || 
-        url.includes('status_id=1') || 
-        url.includes('transaction_status=1')) {
-      setShowWebView(false);
-      handlePaymentSuccess();
-    } else if (url.includes('payment/failed') || 
-               url.includes('status_id=3') ||
-               url.includes('transaction_status=3')) {
-      setShowWebView(false);
-      handlePaymentFailure();
-    }
-  };
-
+const handleWebViewLoadEnd = (navState) => {
+  const { url } = navState.nativeEvent;
+  console.log('WebView load end URL:', url);
+  
+  // Only check for specific status parameters, not generic words
+  if (url.includes('status_id=1') || 
+      url.includes('transaction_status=1')) {
+    console.log('✅ Payment SUCCESS detected on load end');
+    setShowWebView(false);
+    handlePaymentSuccess();
+  } else if (url.includes('status_id=3') || 
+             url.includes('transaction_status=3') ||
+             url.includes('status_id=2')) {
+    console.log('❌ Payment FAILURE detected on load end');
+    setShowWebView(false);
+    handlePaymentFailure();
+  }
+};
   const handlePaymentSuccess = async () => {
+    console.log('🎉 PROCESSING PAYMENT SUCCESS - User selected SUCCESS simulation');
     try {
       console.log('Processing payment success...');
       
@@ -305,56 +283,78 @@ const PaymentScreen = ({ route, navigation }) => {
     }
   };
 
-  const handlePaymentFailure = async () => {
-    try {
-      console.log('Processing payment failure...');
-      
-      // Update transaction statuses
-      if (transactionIds.customer && transactionIds.handyman) {
-        await Promise.all([
-          transactionService.updateTransactionStatus(
-            transactionIds.customer,
-            'failed',
-            { failedAt: new Date().toISOString() }
-          ),
-          transactionService.updateTransactionStatus(
-            transactionIds.handyman,
-            'failed',
-            { failedAt: new Date().toISOString() }
-          )
-        ]);
-      } else if (billCode) {
-        // Fallback: update by bill code
-        await transactionService.updateTransactionStatusByBillCode(
-          billCode,
+const handlePaymentFailure = async () => {
+  console.log('💥 PROCESSING PAYMENT FAILURE - User selected FAIL simulation');
+  try {
+    console.log('Processing payment failure...');
+    
+    // Update transaction statuses
+    if (transactionIds.customer && transactionIds.handyman) {
+      await Promise.all([
+        transactionService.updateTransactionStatus(
+          transactionIds.customer,
           'failed',
           { failedAt: new Date().toISOString() }
-        );
-      }
-    } catch (error) {
-      console.error('Error updating failed payment:', error);
+        ),
+        transactionService.updateTransactionStatus(
+          transactionIds.handyman,
+          'failed',
+          { failedAt: new Date().toISOString() }
+        )
+      ]);
+    } else if (billCode) {
+      // Fallback: update by bill code
+      await transactionService.updateTransactionStatusByBillCode(
+        billCode,
+        'failed',
+        { failedAt: new Date().toISOString() }
+      );
     }
-    
-    Alert.alert(
-      'Payment Failed',
-      'Your payment was not successful. Please try again.',
-      [
-        {
-          text: 'Retry',
-          onPress: () => {
-            setBillCode('');
-            setPaymentUrl('');
-            setTransactionIds({ customer: null, handyman: null });
+  } catch (error) {
+    console.error('Error updating failed payment:', error);
+  }
+  
+  // Show detailed failure alert with options
+  Alert.alert(
+    '❌ Payment Failed',
+    'Your payment could not be processed at this time. This could be due to:\n\n• Insufficient funds\n• Bank system maintenance\n• Network connectivity issues\n• Payment cancelled by user\n\nWhat would you like to do?',
+    [
+      {
+        text: 'Try Again',
+        style: 'default',
+        onPress: () => {
+          // Reset states and retry
+          setBillCode('');
+          setPaymentUrl('');
+          setTransactionIds({ customer: null, handyman: null });
+          setIsProcessing(false);
+          // Auto-retry after brief delay
+          setTimeout(() => {
             confirmPayment();
-          }
-        },
-        {
-          text: 'Cancel',
-          onPress: () => navigation.goBack()
+          }, 500);
         }
-      ]
-    );
-  };
+      },
+      {
+        text: 'Choose Different Method',
+        style: 'default',
+        onPress: () => {
+          setBillCode('');
+          setPaymentUrl('');
+          setTransactionIds({ customer: null, handyman: null });
+          setIsProcessing(false);
+          // Stay on current screen to try again
+        }
+      },
+      {
+        text: 'Cancel Payment',
+        style: 'cancel',
+        onPress: () => {
+          navigation.goBack();
+        }
+      }
+    ]
+  );
+};
 
   const handleWebViewError = (error) => {
     console.error('WebView error:', error);
@@ -429,85 +429,28 @@ const PaymentScreen = ({ route, navigation }) => {
           </View>
         </View>
         
-        {/* Payment Methods */}
-        <View style={styles.paymentSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Choose Payment Method</Text>
-          </View>
-          
-          {/* Payment method options */}
-          <View style={styles.paymentOptions}>
-            {/* Credit/Debit Cards */}
-            <TouchableOpacity
-              style={[
-                styles.paymentMethod,
-                selectedMethod === 'card' && styles.selectedMethod
-              ]}
-              onPress={() => setSelectedMethod('card')}
-            >
-              <View style={styles.methodDetails}>
-                <Ionicons name="card-outline" size={28} color="#333333" />
-                <View style={styles.methodInfo}>
-                  <Text style={styles.methodName}>Credit/Debit Card</Text>
-                  <Text style={styles.methodDescription}>Visa, Mastercard, etc.</Text>
-                </View>
-              </View>
-              <View style={styles.radioButton}>
-                {selectedMethod === 'card' && <View style={styles.radioButtonSelected} />}
-              </View>
-            </TouchableOpacity>
-            
-            {/* Online Banking */}
-            <TouchableOpacity
-              style={[
-                styles.paymentMethod,
-                selectedMethod === 'banking' && styles.selectedMethod
-              ]}
-              onPress={() => setSelectedMethod('banking')}
-            >
-              <View style={styles.methodDetails}>
-                <Ionicons name="business-outline" size={28} color="#333333" />
-                <View style={styles.methodInfo}>
-                  <Text style={styles.methodName}>Online Banking</Text>
-                  <Text style={styles.methodDescription}>Maybank, CIMB, Public Bank, etc.</Text>
-                </View>
-              </View>
-              <View style={styles.radioButton}>
-                {selectedMethod === 'banking' && <View style={styles.radioButtonSelected} />}
-              </View>
-            </TouchableOpacity>
-            
-            {/* E-Wallet */}
-            <TouchableOpacity
-              style={[
-                styles.paymentMethod,
-                selectedMethod === 'ewallet' && styles.selectedMethod
-              ]}
-              onPress={() => setSelectedMethod('ewallet')}
-            >
-              <View style={styles.methodDetails}>
-                <Ionicons name="wallet-outline" size={28} color="#333333" />
-                <View style={styles.methodInfo}>
-                  <Text style={styles.methodName}>E-Wallet</Text>
-                  <Text style={styles.methodDescription}>Touch 'n Go, Boost, GrabPay, etc.</Text>
-                </View>
-              </View>
-              <View style={styles.radioButton}>
-                {selectedMethod === 'ewallet' && <View style={styles.radioButtonSelected} />}
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {/* Selected method info */}
-          {selectedMethod && (
-            <View style={styles.selectedMethodInfo}>
-              <Ionicons name="information-circle-outline" size={16} color={Colors.primary} />
-              <Text style={styles.selectedMethodText}>
-                You selected {getPaymentMethodInfo(selectedMethod).name}
-              </Text>
-            </View>
-          )}
-        </View>
+{/* Payment method options */}
+<View style={styles.paymentOptions}>
+  {/* Online Banking Only */}
+  <TouchableOpacity
+    style={[
+      styles.paymentMethod,
+      styles.selectedMethod // Always selected since it's the only option
+    ]}
+    onPress={() => setSelectedMethod('banking')}
+  >
+    <View style={styles.methodDetails}>
+      <Ionicons name="business-outline" size={28} color="#333333" />
+      <View style={styles.methodInfo}>
+        <Text style={styles.methodName}>Online Banking</Text>
+        <Text style={styles.methodDescription}>Maybank, CIMB, Public Bank, etc.</Text>
+      </View>
+    </View>
+    <View style={styles.radioButton}>
+      <View style={styles.radioButtonSelected} />
+    </View>
+  </TouchableOpacity>
+</View>
         
         {/* Payment Notes */}
         <View style={styles.notesContainer}>
@@ -516,7 +459,8 @@ const PaymentScreen = ({ route, navigation }) => {
             Your payment will be processed securely through toyyibPay gateway. You will be redirected to complete the payment using your selected method.
           </Text>
         </View>
-        
+
+
         {/* Payment Button */}
         <TouchableOpacity
           style={[styles.payButton, isProcessing && styles.payButtonDisabled]}
@@ -529,9 +473,9 @@ const PaymentScreen = ({ route, navigation }) => {
               <Text style={styles.loadingText}>Preparing payment...</Text>
             </View>
           ) : (
-            <Text style={styles.payButtonText}>
-              Pay RM {total.toFixed(2)} via {getPaymentMethodInfo(selectedMethod).name}
-            </Text>
+        <Text style={styles.payButtonText}>
+          Pay RM {total.toFixed(2)} via Online Banking
+        </Text>
           )}
         </TouchableOpacity>
         
@@ -572,7 +516,7 @@ const PaymentScreen = ({ route, navigation }) => {
               <Ionicons name="close" size={24} color="#333333" />
             </TouchableOpacity>
             <Text style={styles.webViewTitle}>
-              Pay via {getPaymentMethodInfo(selectedMethod).name}
+              Pay via Online Banking
             </Text>
             <View style={{ width: 24 }} />
           </View>
@@ -587,9 +531,9 @@ const PaymentScreen = ({ route, navigation }) => {
             renderLoading={() => (
               <View style={styles.webViewLoading}>
                 <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={styles.webViewLoadingText}>
-                  Loading {getPaymentMethodInfo(selectedMethod).name} payment page...
-                </Text>
+              <Text style={styles.webViewLoadingText}>
+                Loading Online Banking payment page...
+              </Text>
               </View>
             )}
             javaScriptEnabled={true}
@@ -598,15 +542,18 @@ const PaymentScreen = ({ route, navigation }) => {
             mediaPlaybackRequiresUserAction={false}
             // Add these props to handle the redirect issues
             onShouldStartLoadWithRequest={(request) => {
-              console.log('Should start load with request:', request.url);
+              console.log('Should start load with request URL:', request.url);
               
-              // Check for success/failure in the request URL
-              if (request.url.includes('payment/success') || 
-                  request.url.includes('status_id=1')) {
+              // Only check for specific toyyibPay status parameters
+              if (request.url.includes('status_id=1') || 
+                  request.url.includes('transaction_status=1')) {
+                console.log('✅ SUCCESS: Intercepting success URL');
                 handlePaymentSuccess();
                 return false; // Don't load the URL
-              } else if (request.url.includes('payment/failed') || 
-                         request.url.includes('status_id=3')) {
+              } else if (request.url.includes('status_id=3') || 
+                        request.url.includes('transaction_status=3') ||
+                        request.url.includes('status_id=2')) {
+                console.log('❌ FAILURE: Intercepting failure URL');
                 handlePaymentFailure();
                 return false; // Don't load the URL
               }

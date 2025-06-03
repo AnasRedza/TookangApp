@@ -448,19 +448,22 @@ export const transactionService = {
       let totalPayouts = 0;
       let transactionCount = 0;
 
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        const amount = parseFloat(data.amount) || 0;
-        
-        if (data.type === 'deposit_received') {
-          totalEarnings += amount;
-          availableBalance += amount;
-          transactionCount++;
-        } else if (data.type === 'payout') {
-          totalPayouts += amount;
-          availableBalance -= amount;
-        }
-      });
+ snapshot.forEach(doc => {
+  const data = doc.data();
+  const amount = parseFloat(data.amount) || 0;
+  
+  // Only count completed transactions
+  if (data.status === 'completed') {
+    if (data.type === 'deposit_received') {
+      totalEarnings += amount;
+      availableBalance += amount;
+      transactionCount++;
+    } else if (data.type === 'payout') {
+      totalPayouts += amount;
+      availableBalance -= amount;
+    }
+  }
+});
 
       return {
         totalEarnings,
